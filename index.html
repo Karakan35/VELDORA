@@ -461,10 +461,10 @@
       </div>
 
       <div id="inv-tab">
+        <div class="dice-char-row" id="inv-subtab-row" style="display:none;"></div>
         <div class="dice-char-row" id="inv-char-row"></div>
         <div id="equip-slots"></div>
-        <h3 class="sheet-section-title" id="inv-list-header" style="margin-top:18px;">EŞYALAR</h3>
-        <div id="inv-list"></div>
+        <div id="inv-list-container"></div>
         <button class="add-char-btn" id="btn-add-item" style="display:none;">+ Eşya Ekle</button>
         <button class="add-char-btn" id="btn-add-from-library" style="display:none;">📦 Kütüphaneden Ekle</button>
       </div>
@@ -1100,6 +1100,7 @@
     if(t.sheet.moveBonus == null) t.sheet.moveBonus = 0;
     if(!t.sheet.abilities) t.sheet.abilities = [];
     if(!t.inventory) t.inventory = [];
+    t.inventory.forEach(i => { if(i.qty == null) i.qty = 1; });
     if(!t.equipment) t.equipment = {};
     if(!t.statusEffects) t.statusEffects = [];
     if(!t.kind) t.kind = 'character';
@@ -1362,7 +1363,7 @@
     }
     actingTokenId = t.id;
     $('action-menu-title').textContent = t.name;
-    $('am-melee').style.display = t.kind==='creature' ? 'none' : 'block';
+    $('am-melee').style.display = 'block';
     $('action-menu-backdrop').classList.add('open');
   }
   function closeActionMenu(){ $('action-menu-backdrop').classList.remove('open'); }
@@ -1422,7 +1423,7 @@
 
   function openItemPicker(t){
     const items = (t.inventory||[]).filter(i => (i.tag||'').trim().toLocaleUpperCase('tr') === 'KULLANILABİLİR');
-    const opts = items.map(i => ({ label: '<b>'+esc(i.name)+'</b>', value: i }));
+    const opts = items.map(i => ({ label: '<b>'+esc(i.name)+'</b>' + ((i.qty||1)>1 ? ' <span class="n">×'+i.qty+'</span>' : ''), value: i }));
     openPicker('Eşya Kullan', opts, (item) => {
       resolveItemUse(t, item);
     }, 'Kullanılabilir etiketli eşyası yok.');
@@ -1705,8 +1706,8 @@
 
     $('char-stat-block').style.display = isCreature ? 'none' : 'block';
     $('creature-stat-block').style.display = isCreature ? 'block' : 'none';
-    $('melee-settings-row').style.display = isCreature ? 'none' : 'flex';
-    $('melee-calc-hint').style.display = isCreature ? 'none' : 'block';
+    $('melee-settings-row').style.display = 'flex';
+    $('melee-calc-hint').style.display = 'block';
     $('abilities-header').textContent = isCreature ? 'SALDIRI YETENEKLERİ' : 'YETENEKLER';
 
     updateCalcDisplay(t);
@@ -1822,8 +1823,27 @@
   ];
 
   let invCharId = null;
+  let invSubTab = 'players'; // sadece DM için: 'players' | 'creatures'
+
   function renderInventoryTab(){
-    const mine = session.tokens.filter(t => canControl(t));
+    const subRow = $('inv-subtab-row');
+    subRow.innerHTML = '';
+    if(me.role === 'dm'){
+      subRow.style.display = 'flex';
+      [['players','Oyuncular'],['creatures','Yaratıklar']].forEach(([key,label]) => {
+        const b = document.createElement('button');
+        b.className = 'dice-char-chip' + (invSubTab===key ? ' active':'');
+        b.textContent = label;
+        b.onclick = () => { invSubTab = key; invCharId = null; renderInventoryTab(); };
+        subRow.appendChild(b);
+      });
+    } else {
+      subRow.style.display = 'none';
+    }
+
+    const mine = me.role === 'dm'
+      ? session.tokens.filter(t => invSubTab==='players' ? t.kind!=='creature' : t.kind==='creature')
+      : session.tokens.filter(t => canControl(t)); // oyuncu sadece kendi karakterini görür
     let sel = mine.find(t => t.id === invCharId);
     if(!sel){ sel = mine[0]; invCharId = sel ? sel.id : null; }
 
@@ -1839,9 +1859,20 @@
 
     const equipWrap = $('equip-slots');
     equipWrap.innerHTML = '';
-    $('inv-list-header').style.display = sel ? 'block' : 'none';
+    const listContainer = $('inv-list-container');
+    listContainer.innerHTML = '';
+    $('btn-add-item').style.display = sel ? 'block' : 'none';
+    $('btn-add-from-library').style.display = (sel && me.role==='dm') ? 'block' : 'none';
 
-    if(sel && sel.kind !== 'creature'){
+    if(!sel){
+      const p = document.createElement('p');
+      p.className='map-hint'; p.style.marginTop='0';
+      p.textContent = invSubTab==='creatures' ? 'Henüz savaşa eklenmiş bir yaratık yok.' : 'Envanteri görüntülemek için kontrol ettiğin bir karakter olması lazım.';
+      listContainer.appendChild(p);
+      return;
+    }
+
+    if(sel.kind !== 'creature'){
       const grid = document.createElement('div'); grid.className = 'equip-grid';
       EQUIP_SLOTS.forEach(slotDef => {
         const itemId = sel.equipment ? sel.equipment[slotDef.key] : null;
@@ -1858,63 +1889,98 @@
       equipWrap.appendChild(grid);
     }
 
-    const list = $('inv-list');
-    list.innerHTML = '';
-    $('btn-add-item').style.display = sel ? 'block' : 'none';
-    $('btn-add-from-library').style.display = (sel && me.role==='dm') ? 'block' : 'none';
-    if(!sel){
-      const p = document.createElement('p');
-      p.className='map-hint'; p.style.marginTop='0';
-      p.textContent = 'Envanteri görüntülemek için kontrol ettiğin bir karakter olması lazım.';
-      list.appendChild(p);
-      return;
-    }
-    if((sel.inventory||[]).length === 0){
+    const inv = sel.inventory || [];
+    if(inv.length === 0){
+      const h = document.createElement('h3'); h.className='sheet-section-title'; h.style.marginTop='18px'; h.textContent='EŞYALAR';
+      listContainer.appendChild(h);
       const p = document.createElement('p');
       p.className='map-hint'; p.style.marginTop='0';
       p.textContent = sel.name + ' için henüz eşya eklenmedi.';
-      list.appendChild(p);
+      listContainer.appendChild(p);
+      return;
     }
-    (sel.inventory||[]).forEach(item => {
-      const card = document.createElement('div');
-      card.className = 'item-card';
-      if(item.quality){
-        const q = qualityOf(item.quality);
-        card.style.borderLeft = '4px solid '+q.color;
-      }
-      const info = document.createElement('div'); info.style.flex='1'; info.style.minWidth='0';
-      const nm = document.createElement('div'); nm.className='item-name'; nm.textContent = item.name;
-      info.appendChild(nm);
-      const effectNames = (item.effects||[]).filter(e=>e && e.type!=='none').map(e=>EFFECT_DEFS[e.type]?EFFECT_DEFS[e.type].label:e.type);
-      if(effectNames.length){
-        const eff = document.createElement('div'); eff.style.fontSize='10.5px'; eff.style.color='var(--text-dim)'; eff.style.marginTop='2px';
-        eff.textContent = effectNames.join(', ');
-        info.appendChild(eff);
-      }
-      card.appendChild(info);
-      if((item.tag||'').trim()){
-        const tag = document.createElement('span'); tag.className='item-tag'; tag.textContent = item.tag;
-        card.appendChild(tag);
-      }
-      const equippedSlot = sel.equipment ? EQUIP_SLOTS.find(s => sel.equipment[s.key] === item.id) : null;
-      if(equippedSlot){
-        const badge = document.createElement('span'); badge.className='item-tag';
-        badge.style.background='rgba(90,127,166,.18)'; badge.style.borderColor='var(--mana)'; badge.style.color='var(--mana)';
-        badge.textContent = 'Kuşanılmış: '+equippedSlot.label;
-        card.appendChild(badge);
-      }
-      const rm = document.createElement('button'); rm.className='rm-btn'; rm.textContent='✕';
-      rm.onclick = () => {
+
+    const groups = [
+      { key:'KULLANILABİLİR', title:'KULLANILABİLİRLER' },
+      { key:'GİYİLEBİLİR', title:'GİYİLEBİLİRLER' },
+      { key:'__other__', title:'DİĞER EŞYALAR' }
+    ];
+    groups.forEach(g => {
+      const items = inv.filter(item => {
+        const tagUp = (item.tag||'').trim().toLocaleUpperCase('tr');
+        if(g.key==='__other__') return tagUp!=='KULLANILABİLİR' && tagUp!=='GİYİLEBİLİR';
+        return tagUp===g.key;
+      });
+      if(items.length===0) return;
+      const h = document.createElement('h3'); h.className='sheet-section-title'; h.style.marginTop='18px'; h.textContent = g.title;
+      listContainer.appendChild(h);
+      items.forEach(item => listContainer.appendChild(buildItemCard(sel, item)));
+    });
+  }
+
+  function buildItemCard(sel, item){
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    if(item.quality){
+      const q = qualityOf(item.quality);
+      card.style.borderLeft = '4px solid '+q.color;
+    }
+    const info = document.createElement('div'); info.style.flex='1'; info.style.minWidth='0';
+    const nm = document.createElement('div'); nm.className='item-name';
+    nm.textContent = item.name + ((item.qty||1) > 1 ? ' ×' + item.qty : '');
+    info.appendChild(nm);
+    const effectNames = (item.effects||[]).filter(e=>e && e.type!=='none').map(e=>EFFECT_DEFS[e.type]?EFFECT_DEFS[e.type].label:e.type);
+    if(effectNames.length){
+      const eff = document.createElement('div'); eff.style.fontSize='10.5px'; eff.style.color='var(--text-dim)'; eff.style.marginTop='2px';
+      eff.textContent = effectNames.join(', ');
+      info.appendChild(eff);
+    }
+    card.appendChild(info);
+    const equippedSlot = sel.equipment ? EQUIP_SLOTS.find(s => sel.equipment[s.key] === item.id) : null;
+    if(equippedSlot){
+      const badge = document.createElement('span'); badge.className='item-tag';
+      badge.style.background='rgba(90,127,166,.18)'; badge.style.borderColor='var(--mana)'; badge.style.color='var(--mana)';
+      badge.textContent = 'Kuşanılmış: '+equippedSlot.label;
+      card.appendChild(badge);
+    }
+    const rm = document.createElement('button'); rm.className='rm-btn'; rm.textContent='✕';
+    rm.onclick = () => {
+      if((item.qty||1) > 1){
+        item.qty -= 1;
+      } else {
         sel.inventory = sel.inventory.filter(i=>i.id!==item.id);
         if(sel.equipment){
           EQUIP_SLOTS.forEach(s => { if(sel.equipment[s.key]===item.id) sel.equipment[s.key] = null; });
         }
-        pushRemote(); renderInventoryTab();
-      };
-      card.appendChild(rm);
-      list.appendChild(card);
-    });
+      }
+      pushRemote(); renderInventoryTab();
+    };
+    card.appendChild(rm);
+    return card;
   }
+
+  // Aynı isim + etiket + kalite + efekt setine sahip eşyayı yığın (stack) olarak bulur
+  function findStackMatch(inv, candidate){
+    const sig = JSON.stringify(candidate.effects||[]);
+    return inv.find(i =>
+      i.name.trim().toLowerCase() === candidate.name.trim().toLowerCase() &&
+      (i.tag||'') === (candidate.tag||'') &&
+      (i.quality||'') === (candidate.quality||'') &&
+      JSON.stringify(i.effects||[]) === sig
+    );
+  }
+
+  function addItemToInventory(t, candidate){
+    t.inventory = t.inventory || [];
+    const existing = findStackMatch(t.inventory, candidate);
+    if(existing){
+      existing.qty = (existing.qty||1) + (candidate.qty||1);
+    } else {
+      t.inventory.push(Object.assign({ qty:1 }, candidate));
+    }
+  }
+
+
 
   function openEquipPicker(t, slotDef){
     const currentId = t.equipment ? t.equipment[slotDef.key] : null;
@@ -1950,8 +2016,7 @@
     if(!t) return;
     const name = $('ni-name').value.trim();
     if(!name) return;
-    t.inventory = t.inventory || [];
-    t.inventory.push({ id:'i'+Date.now()+Math.floor(Math.random()*999), name, tag: $('ni-tag').value.trim() });
+    addItemToInventory(t, { id:'i'+Date.now()+Math.floor(Math.random()*999), name, tag: $('ni-tag').value.trim() });
     $('item-modal-backdrop').classList.remove('open');
     await pushRemote();
     renderInventoryTab();
@@ -1966,8 +2031,7 @@
       return { label: '<span style="color:'+q.color+'">●</span> ' + esc(tpl.name) + ' <span class="n">('+esc(tpl.type)+')</span>', value: tpl };
     });
     openPicker('Kütüphaneden Eşya Seç', opts, (tpl) => {
-      t.inventory = t.inventory || [];
-      t.inventory.push({
+      addItemToInventory(t, {
         id:'i'+Date.now()+Math.floor(Math.random()*999),
         name: tpl.name, tag: tpl.type, quality: tpl.quality,
         effects: JSON.parse(JSON.stringify(tpl.effects||[]))
@@ -2402,7 +2466,7 @@
       ac, hit, dmg, atkType:'fiziksel', ts:Date.now()
     };
     logRoll(entry);
-    if(hit) applyOnHitPassives(actor, target, dmg, true);
+    if(hit) applyOnHitPassives(actor, target, dmg, 'fiziksel');
     actionMode = null; actingTokenId = null; pendingAbility = null;
     await pushRemote();
     renderAll();
@@ -2429,7 +2493,7 @@
       roll, bonus:skillVal, total, ac, hit, dmg, atkType: ability.dmgType, abilityName: ability.name, ts:Date.now()
     };
     logRoll(entry);
-    if(hit) applyOnHitPassives(actor, target, dmg, false);
+    if(hit) applyOnHitPassives(actor, target, dmg, ability.dmgType);
     actionMode = null; actingTokenId = null; pendingAbility = null;
     await pushRemote();
     renderAll();
@@ -2455,7 +2519,7 @@
     });
   }
 
-  function applyOnHitPassives(actor, target, dmg, isMelee){
+  function applyOnHitPassives(actor, target, dmg, atkType){
     getEquippedEffects(actor).forEach(({eff}) => {
       if(eff.type==='lifesteal' && dmg>0){
         const heal = Math.round(dmg * (parseFloat(eff.params.percent)||0)/100);
@@ -2467,7 +2531,7 @@
         }
       }
     });
-    if(isMelee){
+    if(atkType==='fiziksel'){
       getEquippedEffects(target).forEach(({eff}) => {
         if(eff.type==='thorns' && dmg>0){
           const reflect = resolveAmountValue(eff.params.amount, dmg);
@@ -2477,6 +2541,8 @@
             queueFloat(actor.id, actor.hp - before);
             logSystemEvent(target.name + '\'in dikenleri ' + actor.name + '\'e ' + reflect + ' hasar verdi.');
             checkDeath(actor);
+          } else {
+            logSystemEvent(target.name + '\'in dikenleri tetiklendi ama hasar 0\'a yuvarlandı (miktar: "' + (eff.params.amount||'boş') + '", gelen hasar: ' + dmg + ').');
           }
         }
       });
@@ -2632,7 +2698,11 @@
   }
 
   async function resolveItemUse(actor, item){
-    actor.inventory = (actor.inventory||[]).filter(i => i.id !== item.id);
+    if((item.qty||1) > 1){
+      item.qty -= 1;
+    } else {
+      actor.inventory = (actor.inventory||[]).filter(i => i.id !== item.id);
+    }
     applyItemEffectsOnUse(actor, item);
     const entry = {
       id:'r'+Date.now()+Math.floor(Math.random()*999),
