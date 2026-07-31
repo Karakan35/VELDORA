@@ -673,6 +673,7 @@
   ];
 
   const ITEM_TYPES = ['Kullanılabilir','Giyilebilir','Malzeme','Ivır Zıvır','Diğer'];
+  const BUFFABLE_STATS = ['acBoost','dmgBoost','statBonus','movementBoost','maxHpBoost'];
   const QUALITIES = [
     {key:'beyaz',    label:'Değersiz',  color:'#c9c2b8'},
     {key:'yesil',    label:'Yaygın',    color:'#6f8f5a'},
@@ -703,10 +704,7 @@
     dmgBoost: { label:'Hasar Artışı', params:[
                   {key:'dmgType', label:'Tür', type:'select', options:['Fiziksel','Büyüsel']},
                   {key:'amount', label:'Miktar', type:'number'} ] },
-    buffDebuff:{ label:'Güçlendirme / Zayıflatma (Buff/Debuff)', params:[
-                  {key:'target', label:'Hedef (AC, Hasar, Özellik…)', type:'text'},
-                  {key:'amount', label:'Miktar (+/-)', type:'number'},
-                  {key:'duration', label:'Süre', type:'text', placeholder:'ör. 3 tur / Savaş Boyunca'} ] },
+    buffDebuff:{ label:'Güçlendirme / Zayıflatma (Buff/Debuff)', guided:true, params:[] },
     stun:     { label:'Sersemletme (Stun / Freeze / Sleep / Shocked)', params:[
                   {key:'statusName', label:'Durum', type:'select', options:['Stun','Freeze','Sleep','Shocked']},
                   {key:'duration', label:'Süre (Tur)', type:'number'} ] },
@@ -741,22 +739,94 @@
     return {
       className:'', level:1, portrait:null, hpBonus:0, manaBonus:0, skills,
       meleeRange:1, meleeDamageBonus:0, acPhysical:5, acMagical:5, abilities:[],
-      fixedMaxHp:null, fixedMaxMp:null
+      fixedMaxHp:null, fixedMaxMp:null, moveBonus:0
     };
   }
 
   // Türetilmiş istatistikler: bunlar hiçbir zaman ayrı saklanmaz, her zaman anlık hesaplanır
+  // ---------- Active item effects ----------
+  function getEquippedEffects(t){
+    if(t.kind==='creature' || !t.equipment || !t.inventory) return [];
+    const out = [];
+    Object.values(t.equipment).forEach(itemId => {
+      if(!itemId) return;
+      const item = t.inventory.find(i=>i.id===itemId);
+      if(!item || !item.effects) return;
+      item.effects.forEach(e => { if(e && e.type && e.type!=='none') out.push({eff:e, item}); });
+    });
+    return out;
+  }
+  function rollDiceExpr(expr){
+    const s = String(expr==null?'':expr).trim();
+    const m = s.match(/^(\d+)d(\d+)$/i);
+    if(m){
+      const n = parseInt(m[1]), sides = parseInt(m[2]);
+      let total = 0;
+      for(let i=0;i<n;i++) total += 1+Math.floor(Math.random()*sides);
+      return total;
+    }
+    const num = parseFloat(s);
+    return isNaN(num) ? 0 : Math.round(num);
+  }
+  function resolveAmountValue(raw, baseForPercent){
+    const s = String(raw==null?'':raw).trim();
+    if(s.endsWith('%')){
+      const pct = parseFloat(s)||0;
+      return Math.round((baseForPercent||0) * pct/100);
+    }
+    return rollDiceExpr(s);
+  }
+  function hasResistance(t, statusLabel){
+    return getEquippedEffects(t).some(({eff}) => eff.type==='resistance' &&
+      (eff.params.statusName||'').trim().toLocaleUpperCase('tr') === (statusLabel||'').trim().toLocaleUpperCase('tr'));
+  }
+  function hasBlockingStun(t){
+    return (t.statusEffects||[]).some(se => se.effectType==='stun');
+  }
+  function hasSilence(t){
+    return (t.statusEffects||[]).some(se => se.effectType==='silence');
+  }
+
+  // Bir eşyada/tur bazlı etkide "Buff/Debuff" olarak tanımlanmış, belirli bir alt-istatistiği
+  // (statType) etkileyen tüm kaynakları toplar: kalıcı (kuşanılan eşya) + süreli (statusEffects).
+  function collectBuffDebuff(t, statType, matchExtra){
+    let total = 0;
+    getEquippedEffects(t).forEach(({eff}) => {
+      if(eff.type!=='buffDebuff' || eff.params.statType!==statType || eff.params.timing!=='instant') return;
+      if(matchExtra && !matchExtra(eff.params)) return;
+      const amt = parseFloat(eff.params.amount)||0;
+      total += (eff.params.mode==='debuff' ? -amt : amt);
+    });
+    (t.statusEffects||[]).forEach(se => {
+      if(se.effectType!=='buffDebuff' || se.params.statType!==statType) return;
+      if(matchExtra && !matchExtra(se.params)) return;
+      const amt = parseFloat(se.params.amount)||0;
+      total += (se.params.mode==='debuff' ? -amt : amt);
+    });
+    return total;
+  }
+
   function findSkillValue(t, label){
     const skills = (t.sheet && t.sheet.skills) || [];
     const s = skills.find(sk => (sk.label||'').trim().toUpperCase() === label);
-    return s ? (parseInt(s.value)||0) : 0;
+    let val = s ? (parseInt(s.value)||0) : 0;
+    getEquippedEffects(t).forEach(({eff}) => {
+      if(eff.type==='statBonus' && (eff.params.stat||'').trim().toUpperCase() === label){
+        val += parseInt(eff.params.amount)||0;
+      }
+    });
+    val += collectBuffDebuff(t, 'statBonus', p => (p.stat||'').trim().toUpperCase() === label);
+    return val;
   }
   function getMaxHp(t){
-    if(t.kind==='creature' && t.sheet && t.sheet.fixedMaxHp != null) return Math.max(1, t.sheet.fixedMaxHp);
+    if(t.kind==='creature' && t.sheet && t.sheet.fixedMaxHp != null) return Math.max(1, t.sheet.fixedMaxHp + collectBuffDebuff(t,'maxHpBoost'));
     const level = (t.sheet && t.sheet.level) || 1;
     const direnc = findSkillValue(t, 'DİRENÇ');
     const bonus = (t.sheet && t.sheet.hpBonus) || 0;
-    return Math.max(1, level + direnc + bonus);
+    let equipBonus = 0;
+    getEquippedEffects(t).forEach(({eff}) => { if(eff.type==='maxHpBoost') equipBonus += parseInt(eff.params.amount)||0; });
+    equipBonus += collectBuffDebuff(t, 'maxHpBoost');
+    return Math.max(1, level + direnc + bonus + equipBonus);
   }
   function getMaxMp(t){
     if(t.kind==='creature' && t.sheet && t.sheet.fixedMaxMp != null) return Math.max(0, t.sheet.fixedMaxMp);
@@ -767,7 +837,27 @@
   }
   function getSpeed(t){
     const cevik = findSkillValue(t, 'ÇEVİKLİK');
-    return 2 + Math.floor(cevik/2);
+    let equipBonus = (t.sheet && t.sheet.moveBonus) || 0;
+    getEquippedEffects(t).forEach(({eff}) => { if(eff.type==='movementBoost') equipBonus += parseInt(eff.params.amount)||0; });
+    equipBonus += collectBuffDebuff(t, 'movementBoost');
+    return Math.max(0, 2 + Math.floor(cevik/2) + equipBonus);
+  }
+  function getEffectiveAC(t, isMagic){
+    const base = isMagic ? (t.sheet.acMagical!=null?t.sheet.acMagical:5) : (t.sheet.acPhysical!=null?t.sheet.acPhysical:5);
+    let bonus = 0;
+    getEquippedEffects(t).forEach(({eff}) => {
+      if(eff.type==='acBoost' && ((eff.params.acType==='Büyüsel')===!!isMagic)) bonus += parseInt(eff.params.amount)||0;
+    });
+    bonus += collectBuffDebuff(t, 'acBoost', p => (p.acType==='Büyüsel')===!!isMagic);
+    return base + bonus;
+  }
+  function getEffectiveDamageBonus(t, isMagic, baseBonus){
+    let bonus = baseBonus||0;
+    getEquippedEffects(t).forEach(({eff}) => {
+      if(eff.type==='dmgBoost' && ((eff.params.dmgType==='Büyüsel')===!!isMagic)) bonus += parseInt(eff.params.amount)||0;
+    });
+    bonus += collectBuffDebuff(t, 'dmgBoost', p => (p.dmgType==='Büyüsel')===!!isMagic);
+    return bonus;
   }
   function clampCurrentStats(t){
     t.hp = Math.max(0, Math.min(t.hp, getMaxHp(t)));
@@ -921,6 +1011,29 @@
     }
   }
 
+  function renderStatusBadges(t, info){
+    const active = (t.statusEffects||[]);
+    if(active.length===0) return;
+    const row = document.createElement('div');
+    row.style.display='flex'; row.style.flexWrap='wrap'; row.style.gap='4px'; row.style.marginTop='4px';
+    active.forEach(se => {
+      const def = EFFECT_DEFS[se.effectType];
+      let text;
+      if(se.effectType==='buffDebuff'){
+        const statDef = EFFECT_DEFS[se.params.statType];
+        const sign = se.params.mode==='debuff' ? '-' : '+';
+        text = (se.params.mode==='debuff'?'Zayıflama':'Güçlenme') + ': ' + (statDef?statDef.label:se.params.statType) + ' ' + sign + (se.params.amount||0);
+      } else {
+        text = (def?def.label:se.effectType);
+      }
+      const badge = document.createElement('span'); badge.className='item-tag';
+      badge.style.background='rgba(226,99,42,.16)'; badge.style.borderColor='var(--ember-bright)'; badge.style.color='var(--ember-bright)';
+      badge.textContent = text + ' (' + se.remaining + ' tur)';
+      row.appendChild(badge);
+    });
+    info.appendChild(row);
+  }
+
   function esc(s){
     return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
@@ -967,9 +1080,11 @@
     if(t.sheet.meleeDamageBonus == null) t.sheet.meleeDamageBonus = 0;
     if(t.sheet.acPhysical == null) t.sheet.acPhysical = 5;
     if(t.sheet.acMagical == null) t.sheet.acMagical = 5;
+    if(t.sheet.moveBonus == null) t.sheet.moveBonus = 0;
     if(!t.sheet.abilities) t.sheet.abilities = [];
     if(!t.inventory) t.inventory = [];
     if(!t.equipment) t.equipment = {};
+    if(!t.statusEffects) t.statusEffects = [];
     if(!t.kind) t.kind = 'character';
     if(t.inBattle == null) t.inBattle = (t.kind === 'character');
     if(t.hp == null) t.hp = getMaxHp(t);
@@ -1006,7 +1121,9 @@
     (session.rollLog||[]).slice(0,10).forEach(r => {
       const chip = document.createElement('div');
       chip.className = 'roll-chip' + (r.roll===20?' crit20':'') + (r.roll===1?' crit1':'');
-      if(r.combat){
+      if(r.system){
+        chip.innerHTML = '✨ ' + esc(r.text);
+      } else if(r.combat){
         const label = r.skillLabel ? (' ('+r.skillLabel+')') : '';
         const outcome = r.hit ? ('İSABET · '+r.dmg+' hasar') : 'ISKALADI';
         chip.innerHTML = esc(r.charName) + ' → ' + esc(r.targetName) + ': <b>' + r.roll + (r.bonus?(' +'+r.bonus):'') + ' = ' + r.total + '</b>' + esc(label) + ' vs AC ' + r.ac + ' — ' + outcome;
@@ -1051,6 +1168,8 @@
     const sorted = participants.slice().sort((a,b) => computeInitiative(b) - computeInitiative(a));
     session.turnOrder = sorted.map(t=>t.id);
     session.activeTokenId = session.turnOrder[0] || null;
+    const newActive = session.tokens.find(t=>t.id===session.activeTokenId);
+    if(newActive) await tickStatusEffects(newActive);
     await pushRemote();
     renderAll();
   }
@@ -1065,6 +1184,8 @@
     if(!(me.role==='dm' || (active && active.owner===me.name))) return;
     const curIdx = activeIds.indexOf(session.activeTokenId);
     session.activeTokenId = activeIds[(curIdx+1) % activeIds.length];
+    const newActive = session.tokens.find(t=>t.id===session.activeTokenId);
+    if(newActive) await tickStatusEffects(newActive);
     await pushRemote();
     renderAll();
   }
@@ -1217,6 +1338,10 @@
 
   // ---------- Action menu ----------
   function openActionMenu(t){
+    if(hasBlockingStun(t)){
+      alert(t.name + ' sersemlemiş/dondurulmuş durumda — bu tur aksiyon alamıyor. "Turu Bitir" ile geç.');
+      return;
+    }
     actingTokenId = t.id;
     $('action-menu-title').textContent = t.name;
     $('am-melee').style.display = t.kind==='creature' ? 'none' : 'block';
@@ -1230,6 +1355,7 @@
     const t = session.tokens.find(x=>x.id===actingTokenId);
     closeActionMenu();
     if(!t) return;
+    if(hasSilence(t)){ alert(t.name + ' susturulmuş durumda — yetenek kullanamıyor.'); return; }
     openAbilityPicker(t);
   };
   $('am-item').onclick = () => {
@@ -1318,6 +1444,7 @@
       ownerLine.className = 'owner';
       ownerLine.textContent = t.owner ? ('Sahibi: '+t.owner) : 'Sahipsiz';
       info.appendChild(nameRow); info.appendChild(ownerLine);
+      renderStatusBadges(t, info);
 
       function buildStatRow(statKey, maxVal, colorFn){
         const row = document.createElement('div');
@@ -1405,6 +1532,8 @@
   function checkDeath(t){
     if(t.kind==='creature' && t.inBattle && t.hp<=0){
       playDeathAnimation(t.id);
+    } else if(t.kind!=='creature' && t.hp<=0){
+      checkRevive(t);
     }
   }
 
@@ -1806,6 +1935,7 @@
       const statusLine = document.createElement('div'); statusLine.className='owner';
       statusLine.textContent = t.inBattle ? 'Savaşta' : 'Sırada bekliyor';
       info.appendChild(nameRow); info.appendChild(statusLine);
+      renderStatusBadges(t, info);
 
       function buildRow(statKey, maxVal, colorFn){
         const row = document.createElement('div'); row.className = 'hp-row';
@@ -2001,8 +2131,17 @@
     };
     card.appendChild(sel);
 
-    const def = EFFECT_DEFS[tpl.effects[idx].type] || EFFECT_DEFS.none;
-    def.params.forEach(p => {
+    if(tpl.effects[idx].type === 'buffDebuff'){
+      buildBuffDebuffWizard(card, tpl.effects[idx].params);
+    } else {
+      const def = EFFECT_DEFS[tpl.effects[idx].type] || EFFECT_DEFS.none;
+      renderParamFields(card, def.params, tpl.effects[idx].params, pushRemote);
+    }
+    return card;
+  }
+
+  function renderParamFields(card, params, paramsObj, onChange){
+    params.forEach(p => {
       const lbl = document.createElement('label'); lbl.className='effect-param-label'; lbl.textContent = p.label;
       card.appendChild(lbl);
       let input;
@@ -2010,22 +2149,74 @@
         input = document.createElement('select');
         p.options.forEach(optVal => {
           const o = document.createElement('option'); o.value = optVal; o.textContent = optVal;
-          if((tpl.effects[idx].params[p.key]||'') === optVal) o.selected = true;
+          if((paramsObj[p.key]||'') === optVal) o.selected = true;
           input.appendChild(o);
         });
       } else {
         input = document.createElement('input');
         input.type = p.type === 'number' ? 'number' : 'text';
         if(p.placeholder) input.placeholder = p.placeholder;
-        input.value = tpl.effects[idx].params[p.key] != null ? tpl.effects[idx].params[p.key] : '';
+        input.value = paramsObj[p.key] != null ? paramsObj[p.key] : '';
       }
-      input.onchange = async () => {
-        tpl.effects[idx].params[p.key] = input.value;
-        await pushRemote();
-      };
+      input.onchange = async () => { paramsObj[p.key] = input.value; await onChange(); };
       card.appendChild(input);
     });
-    return card;
+  }
+
+  // Buff/Debuff için adım adım soran sihirbaz: Buff mu Debuff mı? → Etkisi ne? → Hemen mi zamanla mı? → gerekli alt alanlar
+  function buildBuffDebuffWizard(card, params){
+    const lbl1 = document.createElement('label'); lbl1.className='effect-param-label'; lbl1.textContent='Buff mu, Debuff mı?';
+    card.appendChild(lbl1);
+    const modeSel = document.createElement('select');
+    const modeNone = document.createElement('option'); modeNone.value=''; modeNone.textContent='Seç…';
+    modeSel.appendChild(modeNone);
+    [['buff','Buff (Güçlendirme)'],['debuff','Debuff (Zayıflatma)']].forEach(([v,l]) => {
+      const o=document.createElement('option'); o.value=v; o.textContent=l;
+      if(params.mode===v) o.selected=true;
+      modeSel.appendChild(o);
+    });
+    modeSel.onchange = async () => { params.mode = modeSel.value; renderItemEditor(); await pushRemote(); };
+    card.appendChild(modeSel);
+    if(!params.mode) return;
+
+    const lbl2 = document.createElement('label'); lbl2.className='effect-param-label'; lbl2.textContent='Etkisi Ne?';
+    card.appendChild(lbl2);
+    const statSel = document.createElement('select');
+    const statNone = document.createElement('option'); statNone.value=''; statNone.textContent='Seç…';
+    statSel.appendChild(statNone);
+    BUFFABLE_STATS.forEach(key => {
+      const o = document.createElement('option'); o.value=key; o.textContent = EFFECT_DEFS[key].label;
+      if(params.statType===key) o.selected=true;
+      statSel.appendChild(o);
+    });
+    statSel.onchange = async () => { params.statType = statSel.value; renderItemEditor(); await pushRemote(); };
+    card.appendChild(statSel);
+    if(!params.statType) return;
+
+    const lbl3 = document.createElement('label'); lbl3.className='effect-param-label'; lbl3.textContent='Hemen mi, Zamanla mı?';
+    card.appendChild(lbl3);
+    const timingSel = document.createElement('select');
+    const timingNone = document.createElement('option'); timingNone.value=''; timingNone.textContent='Seç…';
+    timingSel.appendChild(timingNone);
+    [['instant','Anında (Kalıcı)'],['duration','Zamanla (Süreli)']].forEach(([v,l]) => {
+      const o=document.createElement('option'); o.value=v; o.textContent=l;
+      if(params.timing===v) o.selected=true;
+      timingSel.appendChild(o);
+    });
+    timingSel.onchange = async () => { params.timing = timingSel.value; renderItemEditor(); await pushRemote(); };
+    card.appendChild(timingSel);
+    if(!params.timing) return;
+
+    if(params.timing === 'duration'){
+      const lbl4 = document.createElement('label'); lbl4.className='effect-param-label'; lbl4.textContent='Süre (Tur)';
+      card.appendChild(lbl4);
+      const durInp = document.createElement('input'); durInp.type='number'; durInp.value = params.duration!=null?params.duration:'';
+      durInp.onchange = async () => { params.duration = durInp.value; await pushRemote(); };
+      card.appendChild(durInp);
+    }
+
+    const statDef = EFFECT_DEFS[params.statType];
+    if(statDef) renderParamFields(card, statDef.params, params, pushRemote);
   }
 
   async function toggleCreatureBattle(id){
@@ -2123,10 +2314,10 @@
     const skillVal = findSkillValue(actor, skillLabel);
     const roll = 1 + Math.floor(Math.random()*20);
     const total = roll + skillVal;
-    const ac = target.sheet.acPhysical != null ? target.sheet.acPhysical : 5;
+    const ac = getEffectiveAC(target, false);
     const hit = total >= ac;
-    const dmg = hit ? Math.max(0, 1 + (actor.sheet.meleeDamageBonus||0)) : 0;
-    if(hit) target.hp = Math.max(0, target.hp - dmg);
+    let dmg = hit ? Math.max(0, getEffectiveDamageBonus(actor, false, 1 + (actor.sheet.meleeDamageBonus||0))) : 0;
+    if(hit) applyDamageWithExecute(actor, target, dmg, false);
 
     const entry = {
       id:'r'+Date.now()+Math.floor(Math.random()*999), combat:true,
@@ -2134,6 +2325,7 @@
       ac, hit, dmg, atkType:'fiziksel', ts:Date.now()
     };
     logRoll(entry);
+    if(hit) applyOnHitPassives(actor, target, dmg, true);
     actionMode = null; actingTokenId = null; pendingAbility = null;
     await pushRemote();
     renderAll();
@@ -2148,10 +2340,10 @@
     const roll = 1 + Math.floor(Math.random()*20);
     const total = roll + skillVal;
     const isMagic = ability.dmgType === 'buyusel';
-    const ac = isMagic ? (target.sheet.acMagical!=null?target.sheet.acMagical:5) : (target.sheet.acPhysical!=null?target.sheet.acPhysical:5);
+    const ac = getEffectiveAC(target, isMagic);
     const hit = total >= ac;
-    const dmg = hit ? Math.max(0, parseInt(ability.damage)||0) : 0;
-    if(hit) target.hp = Math.max(0, target.hp - dmg);
+    let dmg = hit ? Math.max(0, getEffectiveDamageBonus(actor, isMagic, parseInt(ability.damage)||0)) : 0;
+    if(hit) applyDamageWithExecute(actor, target, dmg, isMagic);
 
     const entry = {
       id:'r'+Date.now()+Math.floor(Math.random()*999), combat:true,
@@ -2159,14 +2351,191 @@
       roll, bonus:skillVal, total, ac, hit, dmg, atkType: ability.dmgType, abilityName: ability.name, ts:Date.now()
     };
     logRoll(entry);
+    if(hit) applyOnHitPassives(actor, target, dmg, false);
     actionMode = null; actingTokenId = null; pendingAbility = null;
     await pushRemote();
     renderAll();
     checkDeath(target);
   }
 
+  function applyDamageWithExecute(actor, target, dmg, isMagic){
+    target.hp = Math.max(0, target.hp - dmg);
+    getEquippedEffects(actor).forEach(({eff}) => {
+      if(eff.type==='execute' && target.hp>0){
+        const threshold = parseFloat(eff.params.threshold)||0;
+        if((target.hp / getMaxHp(target))*100 <= threshold){
+          const extra = rollDiceExpr(eff.params.extraDamage);
+          target.hp = Math.max(0, target.hp - extra);
+          logSystemEvent(target.name + ' infaz edildi! Ekstra ' + extra + ' hasar aldı.');
+        }
+      }
+    });
+  }
+
+  function applyOnHitPassives(actor, target, dmg, isMelee){
+    getEquippedEffects(actor).forEach(({eff}) => {
+      if(eff.type==='lifesteal' && dmg>0){
+        const heal = Math.round(dmg * (parseFloat(eff.params.percent)||0)/100);
+        if(heal>0){
+          actor.hp = Math.min(getMaxHp(actor), actor.hp + heal);
+          logSystemEvent(actor.name + ' can çalarak ' + heal + ' can kazandı.');
+        }
+      }
+    });
+    if(isMelee){
+      getEquippedEffects(target).forEach(({eff}) => {
+        if(eff.type==='thorns' && dmg>0){
+          const reflect = resolveAmountValue(eff.params.amount, dmg);
+          if(reflect>0){
+            actor.hp = Math.max(0, actor.hp - reflect);
+            logSystemEvent(target.name + '\'in dikenleri ' + actor.name + '\'e ' + reflect + ' hasar verdi.');
+            checkDeath(actor);
+          }
+        }
+      });
+    }
+  }
+
+  function logSystemEvent(text){
+    session.rollLog = session.rollLog || [];
+    session.rollLog.unshift({ id:'sys'+Date.now()+Math.floor(Math.random()*999), system:true, text, ts:Date.now() });
+    session.rollLog = session.rollLog.slice(0, 15);
+  }
+
+  function applyEffectInstance(target, effect, sourceName){
+    const def = EFFECT_DEFS[effect.type];
+    if(!def) return;
+    switch(effect.type){
+      case 'heal': {
+        const amt = rollDiceExpr(effect.params.amount);
+        target.hp = Math.min(getMaxHp(target), target.hp + amt);
+        logSystemEvent(target.name + ' ' + sourceName + ' ile ' + amt + ' can yeniledi.');
+        break;
+      }
+      case 'maxHpBoost': {
+        const amt = parseInt(effect.params.amount)||0;
+        target.sheet.hpBonus = (target.sheet.hpBonus||0) + amt;
+        target.hp = Math.min(getMaxHp(target), target.hp + amt);
+        logSystemEvent(target.name + ' ' + sourceName + ' ile maksimum canı ' + amt + ' arttı.');
+        break;
+      }
+      case 'cleanse': {
+        const which = (effect.params.effectType||'').trim().toLocaleUpperCase('tr');
+        if(!which || which.indexOf('HEP') === 0){
+          target.statusEffects = [];
+        } else {
+          target.statusEffects = (target.statusEffects||[]).filter(se => {
+            const lbl = ((EFFECT_DEFS[se.effectType]||{}).label||'').toLocaleUpperCase('tr');
+            return lbl.indexOf(which) === -1;
+          });
+        }
+        logSystemEvent(target.name + ' ' + sourceName + ' ile arındı.');
+        break;
+      }
+      case 'buffDebuff': {
+        const magnitude = parseFloat(effect.params.amount)||0;
+        const signed = effect.params.mode==='debuff' ? -magnitude : magnitude;
+        const verb = effect.params.mode==='debuff' ? 'zayıflama' : 'güçlenme';
+        if(effect.params.timing === 'instant'){
+          switch(effect.params.statType){
+            case 'acBoost':
+              if(effect.params.acType==='Büyüsel') target.sheet.acMagical = (target.sheet.acMagical||0)+signed;
+              else target.sheet.acPhysical = (target.sheet.acPhysical||0)+signed;
+              break;
+            case 'dmgBoost':
+              target.sheet.meleeDamageBonus = (target.sheet.meleeDamageBonus||0)+signed;
+              break;
+            case 'statBonus': {
+              const sk = (target.sheet.skills||[]).find(s=>(s.label||'').trim().toUpperCase()===(effect.params.stat||'').trim().toUpperCase());
+              if(sk) sk.value = (parseInt(sk.value)||0) + signed;
+              break;
+            }
+            case 'movementBoost':
+              target.sheet.moveBonus = (target.sheet.moveBonus||0) + signed;
+              break;
+            case 'maxHpBoost':
+              target.sheet.hpBonus = (target.sheet.hpBonus||0) + signed;
+              target.hp = Math.max(0, Math.min(getMaxHp(target), target.hp + signed));
+              break;
+          }
+          logSystemEvent(target.name + ' üzerine kalıcı ' + verb + ' işledi (' + sourceName + ').');
+        } else {
+          target.statusEffects = target.statusEffects || [];
+          target.statusEffects.push({
+            id:'se'+Date.now()+Math.floor(Math.random()*999),
+            effectType:'buffDebuff',
+            params: JSON.parse(JSON.stringify(effect.params||{})),
+            remaining: parseInt(effect.params.duration)||1,
+            source: sourceName
+          });
+          logSystemEvent(target.name + ' üzerine süreli ' + verb + ' işledi (' + sourceName + ', ' + (parseInt(effect.params.duration)||1) + ' tur).');
+        }
+        break;
+      }
+      case 'dot': case 'hot': case 'stun': case 'silence': {
+        const statusLabel = effect.params.statusName || def.label;
+        if((effect.type==='stun') && hasResistance(target, statusLabel)){
+          logSystemEvent(target.name + ' dirençli olduğu için etkilenmedi.');
+          break;
+        }
+        target.statusEffects = target.statusEffects || [];
+        target.statusEffects.push({
+          id:'se'+Date.now()+Math.floor(Math.random()*999),
+          effectType: effect.type,
+          params: JSON.parse(JSON.stringify(effect.params||{})),
+          remaining: parseInt(effect.params.duration)||1,
+          source: sourceName
+        });
+        logSystemEvent(target.name + ' üzerine ' + def.label + ' etkisi işledi (' + sourceName + ').');
+        break;
+      }
+      default: break; // pasif efektler (AC/Stat/Hasar/Hareket artışı, Lifesteal, Diken, Direnç, Kritik Kurtarma, İnfaz) kuşanıldığında otomatik hesaba katılıyor
+    }
+  }
+
+  function applyItemEffectsOnUse(actor, item){
+    (item.effects||[]).forEach(e => { if(e && e.type && e.type!=='none') applyEffectInstance(actor, e, item.name); });
+  }
+
+  async function tickStatusEffects(t){
+    if(!t || !t.statusEffects || t.statusEffects.length===0) return;
+    const stillActive = [];
+    for(const se of t.statusEffects){
+      if(se.effectType==='dot'){
+        const dmg = rollDiceExpr(se.params.damage);
+        t.hp = Math.max(0, t.hp - dmg);
+        logSystemEvent(t.name + ' ' + (se.params.damageType||'hasar') + ' etkisiyle ' + dmg + ' hasar aldı.');
+      } else if(se.effectType==='hot'){
+        const heal = rollDiceExpr(se.params.heal);
+        t.hp = Math.min(getMaxHp(t), t.hp + heal);
+        logSystemEvent(t.name + ' ' + heal + ' can yeniledi.');
+      }
+      se.remaining = (se.remaining||1) - 1;
+      if(se.remaining > 0) stillActive.push(se);
+      else logSystemEvent((EFFECT_DEFS[se.effectType]||{}).label + ' etkisi sona erdi: ' + t.name);
+    }
+    t.statusEffects = stillActive;
+    checkDeath(t);
+  }
+
+  function checkRevive(t){
+    if(t.kind==='creature' || t.hp>0) return false;
+    const equipped = getEquippedEffects(t);
+    const reviveEntry = equipped.find(({eff}) => eff.type==='secondChance');
+    if(!reviveEntry) return false;
+    const pct = parseInt(reviveEntry.eff.params.revivePercent)||10;
+    t.hp = Math.max(1, Math.round(getMaxHp(t) * pct/100));
+    // eşya kırılır: envanterden ve slottan kaldır
+    const itemId = reviveEntry.item.id;
+    t.inventory = (t.inventory||[]).filter(i=>i.id!==itemId);
+    Object.keys(t.equipment).forEach(k => { if(t.equipment[k]===itemId) t.equipment[k]=null; });
+    logSystemEvent(t.name + ' ' + reviveEntry.item.name + ' sayesinde %' + pct + ' canla hayata döndü!');
+    return true;
+  }
+
   async function resolveItemUse(actor, item){
     actor.inventory = (actor.inventory||[]).filter(i => i.id !== item.id);
+    applyItemEffectsOnUse(actor, item);
     const entry = {
       id:'r'+Date.now()+Math.floor(Math.random()*999),
       charName:actor.name, skillLabel:null, roll:0, bonus:0, total:0, ts:Date.now(),
