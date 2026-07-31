@@ -770,6 +770,17 @@
     if(t==='creatures') renderCreatureList();
   }
 
+  function applyAvatar(el, t){
+    const portrait = t.sheet && t.sheet.portrait;
+    if(portrait){
+      el.style.background = 'center/cover no-repeat url(' + portrait + ')';
+      el.textContent = '';
+    } else {
+      el.style.background = t.color;
+      el.textContent = t.name.slice(0,2).toUpperCase();
+    }
+  }
+
   function esc(s){
     return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
@@ -940,8 +951,14 @@
         + (isTarget ? ' can-target' + (isAbilityMode?' ability-target':'') : '');
       el.style.width = (CELL-8)+'px'; el.style.height = (CELL-8)+'px';
       el.style.left = (t.col*CELL+4)+'px'; el.style.top = (t.row*CELL+4)+'px';
-      el.style.background = t.color;
-      el.textContent = t.name.slice(0,2).toUpperCase();
+      const portrait = t.sheet && t.sheet.portrait;
+      if(portrait){
+        el.style.background = 'center/cover no-repeat url(' + portrait + ')';
+        el.textContent = '';
+      } else {
+        el.style.background = t.color;
+        el.textContent = t.name.slice(0,2).toUpperCase();
+      }
       el.title = t.name;
       const bar = document.createElement('div');
       bar.className = 'hp-bar-mini';
@@ -1115,7 +1132,7 @@
       card.onclick = () => openSheet(t.id);
 
       const av = document.createElement('div');
-      av.className = 'char-avatar'; av.style.background = t.color; av.textContent = t.name.slice(0,2).toUpperCase();
+      av.className = 'char-avatar'; applyAvatar(av, t);
 
       const info = document.createElement('div');
       info.className = 'char-info';
@@ -1505,7 +1522,7 @@
       card.onclick = () => openSheet(t.id);
 
       const av = document.createElement('div');
-      av.className = 'char-avatar'; av.style.background = t.color; av.textContent = t.name.slice(0,2).toUpperCase();
+      av.className = 'char-avatar'; applyAvatar(av, t);
 
       const info = document.createElement('div');
       info.className = 'char-info';
