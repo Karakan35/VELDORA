@@ -325,6 +325,17 @@
     font-size:10px; padding:3px 8px; border-radius:10px; background:rgba(201,154,63,.14); color:var(--gold-bright);
     border:1px solid var(--gold); text-transform:uppercase; letter-spacing:.03em;
   }
+  .equip-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .equip-slot{
+    background:var(--ink-2); border:1px solid var(--line); border-radius:8px; padding:9px 10px;
+    display:flex; flex-direction:column; gap:2px; cursor:pointer; min-height:44px; justify-content:center;
+  }
+  .equip-slot:active{ background:var(--ink-3); }
+  .equip-slot .slot-label{ font-size:9px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-dim); }
+  .equip-slot .slot-value{ font-size:12.5px; font-weight:600; color:var(--text); }
+  .equip-slot.filled{ border-color:var(--gold); }
+  .equip-slot.filled .slot-value{ color:var(--gold-bright); }
+  .equip-slot .slot-value.empty{ color:var(--text-dim); font-weight:400; font-style:italic; }
 </style>
 </head>
 <body>
@@ -404,6 +415,8 @@
 
       <div id="inv-tab">
         <div class="dice-char-row" id="inv-char-row"></div>
+        <div id="equip-slots"></div>
+        <h3 class="sheet-section-title" id="inv-list-header" style="margin-top:18px;">EŞYALAR</h3>
         <div id="inv-list"></div>
         <button class="add-char-btn" id="btn-add-item" style="display:none;">+ Eşya Ekle</button>
       </div>
@@ -468,7 +481,7 @@
     <h3>Yeni Eşya</h3>
     <div class="field"><label>Eşya Adı</label><input id="ni-name" type="text" maxlength="30"></div>
     <div class="field"><label>Etiket</label><input id="ni-tag" type="text" maxlength="20" placeholder="ör. Kullanılabilir, Pasif, Zırh…"></div>
-    <p style="color:var(--text-dim); font-size:11px; margin:0;">"Kullanılabilir" etiketli eşyalar, Aksiyon menüsündeki "Eşya Kullan" seçeneğinde listelenir.</p>
+    <p style="color:var(--text-dim); font-size:11px; margin:0;">"Kullanılabilir" etiketli eşyalar Eşya Kullan'da, "Giyilebilir" etiketli eşyalar ise karakterlerin ekipman alanında listelenir.</p>
     <div class="modal-actions">
       <button class="ghost-btn" id="ni-cancel">Vazgeç</button>
       <button class="primary-btn" id="ni-save">Ekle</button>
@@ -829,6 +842,7 @@
     if(t.sheet.acMagical == null) t.sheet.acMagical = 5;
     if(!t.sheet.abilities) t.sheet.abilities = [];
     if(!t.inventory) t.inventory = [];
+    if(!t.equipment) t.equipment = {};
     if(!t.kind) t.kind = 'character';
     if(t.inBattle == null) t.inBattle = (t.kind === 'character');
     if(t.hp == null) t.hp = getMaxHp(t);
@@ -1421,19 +1435,33 @@
     d20btn.onclick = () => performRoll(sel, null);
     area.appendChild(d20btn);
 
-    const chips = document.createElement('div');
-    chips.className = 'dice-skills';
-    (sel.sheet ? sel.sheet.skills : []).filter(s => (s.label||'').trim()).forEach(s => {
-      const chip = document.createElement('button');
-      chip.className = 'dice-chip';
-      chip.innerHTML = esc(s.label) + '<span class="n">+'+(parseInt(s.value)||0)+'</span>';
-      chip.onclick = () => performRoll(sel, s);
-      chips.appendChild(chip);
-    });
-    area.appendChild(chips);
+    const skillBtn = document.createElement('button');
+    skillBtn.className = 'dice-btn'; skillBtn.textContent = '✨ Özellikli D20';
+    skillBtn.onclick = () => openSkillRollPicker(sel);
+    area.appendChild(skillBtn);
+  }
+
+  function openSkillRollPicker(t){
+    const skills = (t.sheet ? t.sheet.skills : []).filter(s => (s.label||'').trim());
+    const opts = skills.map(s => ({
+      label: esc(s.label) + ' <span class="n">+'+(parseInt(s.value)||0)+'</span>',
+      value: s
+    }));
+    openPicker('Özellik Seç', opts, (skill) => { performRoll(t, skill); }, 'Bu karakterin tanımlı bir özelliği yok.');
   }
 
   // ---------- Inventory tab ----------
+  const EQUIP_SLOTS = [
+    {key:'weapon', label:'Silah'},
+    {key:'helmet', label:'Kafalık'},
+    {key:'armor', label:'Zırh'},
+    {key:'boots', label:'Ayakkabı'},
+    {key:'gloves', label:'Eldiven'},
+    {key:'ring1', label:'Yüzük 1'},
+    {key:'ring2', label:'Yüzük 2'},
+    {key:'necklace', label:'Kolye'}
+  ];
+
   let invCharId = null;
   function renderInventoryTab(){
     const mine = session.tokens.filter(t => canControl(t));
@@ -1449,6 +1477,27 @@
       b.onclick = () => { invCharId = t.id; renderInventoryTab(); };
       row.appendChild(b);
     });
+
+    const equipWrap = $('equip-slots');
+    equipWrap.innerHTML = '';
+    $('inv-list-header').style.display = sel ? 'block' : 'none';
+
+    if(sel && sel.kind !== 'creature'){
+      const grid = document.createElement('div'); grid.className = 'equip-grid';
+      EQUIP_SLOTS.forEach(slotDef => {
+        const itemId = sel.equipment ? sel.equipment[slotDef.key] : null;
+        const item = itemId ? (sel.inventory||[]).find(i => i.id === itemId) : null;
+        const slotEl = document.createElement('div');
+        slotEl.className = 'equip-slot' + (item ? ' filled' : '');
+        const lbl = document.createElement('div'); lbl.className='slot-label'; lbl.textContent = slotDef.label;
+        const val = document.createElement('div'); val.className = 'slot-value' + (item ? '' : ' empty');
+        val.textContent = item ? item.name : 'Boş';
+        slotEl.appendChild(lbl); slotEl.appendChild(val);
+        slotEl.onclick = () => openEquipPicker(sel, slotDef);
+        grid.appendChild(slotEl);
+      });
+      equipWrap.appendChild(grid);
+    }
 
     const list = $('inv-list');
     list.innerHTML = '';
@@ -1475,14 +1524,47 @@
         const tag = document.createElement('span'); tag.className='item-tag'; tag.textContent = item.tag;
         card.appendChild(tag);
       }
+      const equippedSlot = sel.equipment ? EQUIP_SLOTS.find(s => sel.equipment[s.key] === item.id) : null;
+      if(equippedSlot){
+        const badge = document.createElement('span'); badge.className='item-tag';
+        badge.style.background='rgba(90,127,166,.18)'; badge.style.borderColor='var(--mana)'; badge.style.color='var(--mana)';
+        badge.textContent = 'Kuşanılmış: '+equippedSlot.label;
+        card.appendChild(badge);
+      }
       const rm = document.createElement('button'); rm.className='rm-btn'; rm.textContent='✕';
       rm.onclick = () => {
         sel.inventory = sel.inventory.filter(i=>i.id!==item.id);
+        if(sel.equipment){
+          EQUIP_SLOTS.forEach(s => { if(sel.equipment[s.key]===item.id) sel.equipment[s.key] = null; });
+        }
         pushRemote(); renderInventoryTab();
       };
       card.appendChild(rm);
       list.appendChild(card);
     });
+  }
+
+  function openEquipPicker(t, slotDef){
+    const currentId = t.equipment ? t.equipment[slotDef.key] : null;
+    const wearable = (t.inventory||[]).filter(i => (i.tag||'').trim().toLocaleUpperCase('tr') === 'GİYİLEBİLİR');
+    const opts = [];
+    if(currentId){
+      opts.push({ label: '✕ Çıkar', value: '__unequip__' });
+    }
+    wearable.forEach(item => {
+      const wornElsewhere = t.equipment && Object.keys(t.equipment).some(k => k!==slotDef.key && t.equipment[k]===item.id);
+      opts.push({
+        label: esc(item.name) + (wornElsewhere ? ' <span class="n">(başka slotta)</span>' : ''),
+        value: item.id,
+        disabled: !!wornElsewhere
+      });
+    });
+    openPicker(slotDef.label + ' — Seç', opts, (val) => {
+      if(!t.equipment) t.equipment = {};
+      t.equipment[slotDef.key] = (val === '__unequip__') ? null : val;
+      pushRemote();
+      renderInventoryTab();
+    }, '"Giyilebilir" etiketli eşyan yok. Önce Eşyalar bölümünden ekle.');
   }
 
   $('btn-add-item').onclick = () => {
