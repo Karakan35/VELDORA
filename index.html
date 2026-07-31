@@ -1,0 +1,1947 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Savaş Haritası</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root{
+    --ink: #14121a;
+    --ink-2: #1d1a26;
+    --ink-3: #262232;
+    --line: #3a3448;
+    --parchment: #ece2c6;
+    --parchment-dim: #b9ae90;
+    --ember: #c1440e;
+    --ember-bright: #e2632a;
+    --gold: #c99a3f;
+    --gold-bright: #e6bb5c;
+    --text: #ece6da;
+    --text-dim: #9d93ad;
+    --ok: #6f8f5a;
+    --mana: #5a7fa6;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:
+      radial-gradient(circle at 50% 0%, #241f30 0%, var(--ink) 60%);
+    color:var(--text); font-family:'Inter',sans-serif;
+    display:flex; justify-content:center;
+  }
+  #app{ width:100%; max-width:560px; min-height:100dvh; display:flex; flex-direction:column; position:relative;}
+
+  h1,h2,h3{ font-family:'Cinzel',serif; letter-spacing:.02em; margin:0;}
+  button{ font-family:'Inter',sans-serif; cursor:pointer; border:none; }
+  input{ font-family:'Inter',sans-serif; }
+
+  /* ---------- Setup screen ---------- */
+  .setup-wrap{ flex:1; display:flex; flex-direction:column; justify-content:center; padding:32px 24px; gap:22px;}
+  .setup-title{ text-align:center; }
+  .setup-title h1{ font-size:26px; color:var(--gold-bright); text-shadow:0 0 18px rgba(201,154,63,.35);}
+  .setup-title p{ color:var(--text-dim); font-size:13px; margin-top:6px;}
+  .field label{ display:block; font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); margin-bottom:6px;}
+  .field input, .field select{
+    width:100%; padding:12px 14px; background:var(--ink-2); border:1px solid var(--line);
+    border-radius:6px; color:var(--text); font-size:15px;
+  }
+  .field input:focus, .field select:focus{ outline:none; border-color:var(--gold);}
+  .role-toggle{ display:flex; gap:8px; }
+  .role-toggle button{
+    flex:1; padding:10px; background:var(--ink-2); border:1px solid var(--line); border-radius:6px;
+    color:var(--text-dim); font-size:13px; font-weight:600;
+  }
+  .role-toggle button.active{ background:rgba(201,154,63,.14); border-color:var(--gold); color:var(--gold-bright);}
+  .primary-btn{
+    padding:14px; border-radius:6px; background:linear-gradient(180deg,var(--ember-bright),var(--ember));
+    color:#fff2e8; font-weight:700; font-size:15px; letter-spacing:.02em;
+    box-shadow:0 4px 14px rgba(193,68,14,.35);
+  }
+  .primary-btn:active{ transform:translateY(1px); }
+  .ghost-btn{ padding:12px; border-radius:6px; background:transparent; border:1px solid var(--line); color:var(--text-dim); font-size:13px;}
+  .divider{ display:flex; align-items:center; gap:10px; color:var(--text-dim); font-size:11px; text-transform:uppercase;}
+  .divider::before,.divider::after{ content:""; flex:1; height:1px; background:var(--line);}
+  .status-msg{ font-size:12px; text-align:center; color:var(--ember-bright); min-height:16px;}
+
+  /* ---------- Main app ---------- */
+  #main-screen{ display:none; flex:1; flex-direction:column; }
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between; padding:10px 14px;
+    background:var(--ink-2); border-bottom:1px solid var(--line);
+  }
+  .topbar .code{ font-family:'Cinzel',serif; color:var(--gold-bright); font-size:14px; letter-spacing:.08em;}
+  .topbar .role-pill{ font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.06em;}
+  .topbar .leave{ background:transparent; color:var(--text-dim); font-size:11px; text-decoration:underline;}
+  .topbar-actions{ display:flex; align-items:center; gap:12px; }
+  .turn-banner{
+    padding:8px 14px; text-align:center; font-size:12px; color:var(--text-dim); background:var(--ink);
+    border-bottom:1px solid var(--line);
+  }
+  .turn-banner b{ color:var(--gold-bright); }
+
+  .content{ flex:1; overflow:auto; padding-bottom:70px; }
+
+  /* map */
+  #map-tab{ padding:14px; display:none; }
+  #map-tab.active{ display:block; }
+  .map-scroll{ overflow:auto; border:1px solid var(--line); border-radius:8px; background:
+      linear-gradient(var(--ink-3),var(--ink-3));
+    padding:10px; box-shadow: inset 0 0 40px rgba(0,0,0,.5);
+  }
+  #grid{
+    position:relative; margin:0 auto;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  }
+  .cell-range{ position:absolute; background:rgba(201,154,63,.16); border:1px solid rgba(201,154,63,.4); border-radius:3px; }
+  .cell-range.melee-tint{ background:rgba(226,99,42,.16); border-color:rgba(226,99,42,.45); }
+  .cell-range.ability-tint{ background:rgba(90,127,166,.2); border-color:rgba(90,127,166,.55); }
+  @keyframes tokenDeath{
+    0%{ opacity:1; transform:scale(1) rotate(0deg); }
+    55%{ opacity:.7; transform:scale(1.2) rotate(10deg); }
+    100%{ opacity:0; transform:scale(.15) rotate(30deg); }
+  }
+  .token.token-dying{ animation:tokenDeath .65s ease forwards; pointer-events:none; }
+  .token{
+    position:absolute; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-family:'Cinzel',serif; font-weight:700; color:#1a1220; font-size:13px;
+    border:2px solid rgba(0,0,0,.35); box-shadow:0 2px 6px rgba(0,0,0,.5);
+    transition: left .28s cubic-bezier(.34,1.2,.4,1), top .28s cubic-bezier(.34,1.2,.4,1), transform .16s ease; user-select:none;
+  }
+  .token.selected{ box-shadow:0 0 0 3px var(--gold-bright), 0 0 14px rgba(230,187,92,.7); }
+  .token.active-turn{ box-shadow:0 0 0 2px var(--ember-bright); }
+  .token .hp-bar-mini{
+    position:absolute; bottom:-6px; left:8%; width:84%; height:4px; background:#000a; border-radius:3px; overflow:hidden;
+  }
+  .token .hp-bar-mini i{ display:block; height:100%; background:var(--ok);}
+  .map-hint{ text-align:center; font-size:11px; color:var(--text-dim); margin-top:10px;}
+  .dice-panel{ margin-top:22px; padding-top:16px; border-top:1px solid var(--line); }
+  .dice-char-row{ display:flex; gap:8px; overflow-x:auto; margin-bottom:12px; padding-bottom:2px; }
+  .dice-char-chip{
+    flex-shrink:0; padding:8px 14px; border-radius:20px; background:var(--ink-2); border:1px solid var(--line);
+    color:var(--text-dim); font-size:12px; font-weight:600;
+  }
+  .dice-char-chip.active{ border-color:var(--gold); color:var(--gold-bright); background:rgba(201,154,63,.14); }
+
+  /* character list */
+  #chars-tab{ padding:14px; display:none; }
+  #chars-tab.active{ display:block; }
+  .char-card{
+    display:flex; align-items:center; gap:12px; background:var(--ink-2); border:1px solid var(--line);
+    border-radius:8px; padding:10px 12px; margin-bottom:10px;
+  }
+  .char-card.mine{ border-color:var(--gold); }
+  .char-avatar{
+    width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-family:'Cinzel',serif; font-weight:700; color:#1a1220; flex-shrink:0; border:2px solid rgba(0,0,0,.35);
+  }
+  .char-info{ flex:1; min-width:0; }
+  .char-info .name{ font-weight:600; font-size:14px; display:flex; align-items:center; gap:6px; }
+  .char-info .owner{ font-size:11px; color:var(--text-dim); }
+  .hp-row{ display:flex; align-items:center; gap:6px; margin-top:5px;}
+  .hp-track{ flex:1; height:7px; background:#000a; border-radius:4px; overflow:hidden; clip-path: polygon(0 0,100% 0,100% 70%,97% 100%,3% 100%,0 70%);}
+  .hp-track i{ display:block; height:100%; background:var(--ok); transition:width .2s; }
+  .hp-num{ font-size:11px; color:var(--text-dim); min-width:44px; text-align:right;}
+  .hp-num-input{
+    width:38px; padding:3px 4px; background:var(--ink-3); border:1px solid var(--line); border-radius:4px;
+    color:var(--gold-bright); font-size:11px; font-weight:700; text-align:center;
+  }
+  .hp-btns{ display:flex; gap:4px; }
+  .hp-btns button{
+    width:24px; height:24px; border-radius:5px; background:var(--ink-3); color:var(--text); font-size:14px; line-height:1;
+  }
+  .claim-btn{ font-size:11px; padding:5px 8px; border-radius:5px; background:rgba(201,154,63,.16); color:var(--gold-bright); border:1px solid var(--gold);}
+  .rm-btn{ font-size:16px; color:var(--text-dim); background:transparent; padding:4px; }
+  .add-char-btn{
+    width:100%; padding:12px; border-radius:8px; border:1px dashed var(--line); background:transparent;
+    color:var(--text-dim); font-size:13px; margin-top:4px;
+  }
+
+  /* tab bar */
+  .tabbar{
+    position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:560px;
+    display:flex; background:var(--ink-2); border-top:1px solid var(--line);
+  }
+  .tabbar button{
+    flex:1; padding:12px 0 10px; background:transparent; color:var(--text-dim); font-size:11px;
+    display:flex; flex-direction:column; align-items:center; gap:3px; font-weight:600; letter-spacing:.03em;
+  }
+  .tabbar button .ic{ font-size:18px; }
+  .tabbar button.active{ color:var(--gold-bright); }
+
+  /* modal */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(10,8,14,.7); display:none; align-items:flex-end; justify-content:center; z-index:20;
+  }
+  .modal-backdrop.open{ display:flex; }
+  .modal{
+    width:100%; max-width:560px; background:var(--ink-2); border-top:1px solid var(--line);
+    border-radius:16px 16px 0 0; padding:20px; display:flex; flex-direction:column; gap:12px;
+  }
+  .modal h3{ color:var(--gold-bright); font-size:16px; }
+  .color-row{ display:flex; gap:8px; flex-wrap:wrap; }
+  .color-swatch{ width:30px; height:30px; border-radius:50%; border:2px solid transparent; }
+  .color-swatch.sel{ border-color:#fff; }
+  .modal-actions{ display:flex; gap:10px; margin-top:6px; }
+  .modal-actions .ghost-btn{ flex:1; text-align:center; }
+  .modal-actions .primary-btn{ flex:2; text-align:center; }
+
+  /* ---------- Character sheet ---------- */
+  .char-card{ cursor:pointer; }
+  .sheet-overlay{
+    position:fixed; inset:0; max-width:560px; margin:0 auto; background:var(--ink);
+    display:flex; flex-direction:column; transform:translateY(100%); transition:transform .22s ease;
+    z-index:30;
+  }
+  .sheet-overlay.open{ transform:translateY(0); }
+  .sheet-header{
+    display:flex; align-items:center; justify-content:space-between; padding:12px 14px;
+    background:var(--ink-2); border-bottom:1px solid var(--line); flex-shrink:0;
+  }
+  .sheet-header button{ background:transparent; color:var(--gold-bright); font-size:14px; font-weight:600; }
+  .sheet-header-title{ font-family:'Cinzel',serif; font-size:14px; color:var(--text-dim); letter-spacing:.04em;}
+  .sheet-body{ flex:1; overflow:auto; padding:18px 16px 40px; }
+  .sheet-top{ display:flex; gap:14px; margin-bottom:22px; }
+  .portrait-wrap{
+    width:84px; height:84px; border-radius:12px; background:var(--ink-2); border:1px solid var(--line);
+    flex-shrink:0; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative;
+  }
+  .portrait-wrap img{ width:100%; height:100%; object-fit:cover; }
+  .portrait-wrap #portrait-placeholder{ font-size:11px; color:var(--text-dim); text-align:center; }
+  .sheet-top-fields{ flex:1; display:flex; flex-direction:column; gap:10px; }
+  .field-row{ display:flex; gap:10px; }
+  .field-row .field{ flex:1; }
+  .sheet-section-title{ font-size:13px; color:var(--gold-bright); margin-bottom:10px; letter-spacing:.04em; }
+  .stat-summary{ display:flex; gap:10px; margin-bottom:14px; }
+  .stat-box{
+    flex:1; background:var(--ink-2); border:1px solid var(--line); border-radius:8px; padding:10px 8px; text-align:center;
+  }
+  .stat-box label{ display:block; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-dim); margin-bottom:4px;}
+  .stat-box div{ font-family:'Cinzel',serif; font-size:18px; color:var(--gold-bright); font-weight:700; }
+  .calc-hint{ font-size:10.5px; color:var(--text-dim); line-height:1.5; margin:8px 0 20px; }
+  .dice-btn{
+    width:100%; padding:14px; border-radius:8px; margin-bottom:10px;
+    background:linear-gradient(180deg,var(--gold-bright),var(--gold)); color:#241a08; font-weight:700; font-size:15px;
+    box-shadow:0 4px 14px rgba(201,154,63,.3);
+  }
+  .dice-skills{ display:flex; flex-wrap:wrap; gap:7px; }
+  .dice-chip{
+    padding:8px 12px; border-radius:20px; background:var(--ink-2); border:1px solid var(--line);
+    color:var(--text); font-size:12px; font-weight:600;
+  }
+  .dice-chip .n{ color:var(--gold-bright); margin-left:4px; }
+  .roll-log{
+    display:flex; gap:8px; overflow-x:auto; padding:8px 14px; background:var(--ink); border-bottom:1px solid var(--line);
+  }
+  .roll-log:empty{ display:none; }
+  .roll-chip{
+    flex-shrink:0; font-size:11px; color:var(--text-dim); background:var(--ink-2); border:1px solid var(--line);
+    border-radius:14px; padding:5px 10px; white-space:nowrap;
+  }
+  .roll-chip b{ color:var(--gold-bright); }
+  .roll-chip.crit20 b{ color:var(--ok); }
+  .roll-chip.crit1 b{ color:var(--ember-bright); }
+  .roll-toast{
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(.7); z-index:50;
+    background:var(--ink-2); border:2px solid var(--gold); border-radius:16px; padding:24px 34px;
+    text-align:center; opacity:0; pointer-events:none; transition:opacity .18s ease, transform .18s ease;
+    box-shadow:0 10px 40px rgba(0,0,0,.6);
+  }
+  .roll-toast.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+  .roll-toast .big{ font-family:'Cinzel',serif; font-size:40px; font-weight:700; color:var(--gold-bright); }
+  .roll-toast.crit20 .big{ color:var(--ok); text-shadow:0 0 20px rgba(111,143,90,.6); }
+  .roll-toast.crit1 .big{ color:var(--ember-bright); text-shadow:0 0 20px rgba(226,99,42,.6); }
+  .roll-toast .sub{ font-size:12px; color:var(--text-dim); margin-top:4px; }
+  .skill-row{ display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+  .skill-label{
+    flex:1; padding:9px 10px; background:var(--ink-2); border:1px solid var(--line); border-radius:6px;
+    color:var(--text); font-size:13px; min-width:0;
+  }
+  .skill-cat{
+    width:44px; padding:9px 4px; background:var(--ink-3); border:1px solid var(--line); border-radius:6px;
+    color:var(--text-dim); font-size:11px; text-align:center; text-transform:uppercase;
+  }
+  .skill-val{
+    width:46px; padding:9px 4px; background:var(--ink-3); border:1px solid var(--line); border-radius:6px;
+    color:var(--gold-bright); font-size:13px; text-align:center; font-weight:700;
+  }
+  .skill-label:disabled, .skill-cat:disabled, .skill-val:disabled,
+  #sheet-name:disabled, #sheet-class:disabled, #sheet-level:disabled{ opacity:.6; }
+
+  /* ---------- Abilities ---------- */
+  .ability-card{
+    background:var(--ink-2); border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:10px;
+  }
+  .ability-name{
+    width:100%; padding:9px 10px; background:var(--ink-3); border:1px solid var(--line); border-radius:6px;
+    color:var(--gold-bright); font-size:14px; font-weight:700; font-family:'Cinzel',serif; margin-bottom:8px;
+  }
+  .ability-desc{
+    width:100%; padding:8px 10px; background:var(--ink-3); border:1px solid var(--line); border-radius:6px;
+    color:var(--text); font-size:12px; font-family:'Inter',sans-serif; resize:vertical; min-height:40px; margin-bottom:8px;
+  }
+  .ability-grid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:8px; }
+  .ability-grid label{ display:block; font-size:9px; color:var(--text-dim); text-transform:uppercase; margin-bottom:3px;}
+  .ability-grid input, .ability-grid select{
+    width:100%; padding:7px 6px; background:var(--ink-3); border:1px solid var(--line); border-radius:5px;
+    color:var(--text); font-size:12px;
+  }
+  .ability-row2{ display:flex; gap:8px; margin-bottom:8px; }
+  .ability-row2 > div{ flex:1; }
+  .ability-remove{
+    width:100%; padding:7px; border-radius:6px; background:transparent; border:1px solid var(--line);
+    color:var(--text-dim); font-size:11px;
+  }
+
+  /* ---------- Action menu on map ---------- */
+  .action-menu-btn{
+    width:100%; padding:14px; border-radius:8px; margin-bottom:8px; background:var(--ink-3);
+    border:1px solid var(--line); color:var(--text); font-size:14px; font-weight:600; text-align:left; display:flex; align-items:center; gap:10px;
+  }
+  .action-menu-btn:active{ background:var(--ink); }
+  .mode-banner{
+    display:none; align-items:center; justify-content:space-between; gap:10px; padding:9px 12px; margin-bottom:10px;
+    background:rgba(201,154,63,.12); border:1px solid var(--gold); border-radius:8px; font-size:12px; color:var(--gold-bright);
+  }
+  .mode-banner.show{ display:flex; }
+  .mode-banner button{ background:transparent; color:var(--text-dim); font-size:11px; text-decoration:underline; flex-shrink:0; }
+  .token.can-target{ box-shadow:0 0 0 3px var(--ember-bright), 0 0 14px rgba(226,99,42,.7); cursor:pointer; }
+  .token.can-target.ability-target{ box-shadow:0 0 0 3px var(--mana), 0 0 14px rgba(90,127,166,.7); }
+
+  /* ---------- Inventory ---------- */
+  #inv-tab{ padding:14px; display:none; }
+  #inv-tab.active{ display:block; }
+  #creatures-tab{ padding:14px; display:none; }
+  #creatures-tab.active{ display:block; }
+  .item-card{
+    display:flex; align-items:center; gap:10px; background:var(--ink-2); border:1px solid var(--line);
+    border-radius:8px; padding:10px 12px; margin-bottom:8px;
+  }
+  .item-card .item-name{ flex:1; font-size:13px; font-weight:600; }
+  .item-tag{
+    font-size:10px; padding:3px 8px; border-radius:10px; background:rgba(201,154,63,.14); color:var(--gold-bright);
+    border:1px solid var(--gold); text-transform:uppercase; letter-spacing:.03em;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- SETUP SCREEN -->
+  <div id="setup-screen" class="setup-wrap">
+    <div class="setup-title">
+      <h1>⚔ Savaş Haritası</h1>
+      <p>Masa başındaki oturumun için kareli taktik harita — herkes kendi cihazından bağlanır.</p>
+    </div>
+
+    <div class="field">
+      <label>Adın</label>
+      <input id="in-name" type="text" placeholder="ör. Kaan, ya da karakter adın" maxlength="20">
+    </div>
+
+    <div class="field">
+      <label>Rolün</label>
+      <div class="role-toggle">
+        <button id="role-dm" type="button">Zindan Ustası</button>
+        <button id="role-player" type="button" class="active">Oyuncu</button>
+      </div>
+      <p style="color:var(--text-dim); font-size:11px; margin-top:6px;">Not: Yeni oda kurarsan otomatik Zindan Ustası olursun. Bu seçim var olan bir odaya katılırken geçerli.</p>
+    </div>
+
+    <div class="field">
+      <label>Oda Kodu</label>
+      <input id="in-code" type="text" placeholder="ör. AV3K (var olan odaya girmek için)" maxlength="6" style="text-transform:uppercase">
+    </div>
+
+    <button class="primary-btn" id="btn-join">Odaya Katıl</button>
+    <div class="divider">veya</div>
+    <button class="ghost-btn" id="btn-create">Yeni Oda Oluştur</button>
+    <div class="status-msg" id="setup-status"></div>
+  </div>
+
+  <!-- MAIN SCREEN -->
+  <div id="main-screen">
+    <div class="topbar">
+      <div>
+        <div class="code">ODA: <span id="hdr-code"></span></div>
+        <div class="role-pill" id="hdr-role"></div>
+      </div>
+      <div class="topbar-actions">
+        <button class="leave" id="btn-export" style="display:none;">Yedek Al</button>
+        <button class="leave" id="btn-import" style="display:none;">Yedek Yükle</button>
+        <input type="file" id="import-input" accept="application/json" style="display:none;">
+        <button class="leave" id="btn-leave">Odadan Çık</button>
+      </div>
+    </div>
+    <div class="turn-banner" id="turn-banner">Sıra bekleniyor…</div>
+    <div class="roll-log" id="roll-log"></div>
+
+    <div class="content">
+      <div id="map-tab" class="active">
+        <div class="mode-banner" id="mode-banner">
+          <span id="mode-banner-text"></span>
+          <button id="mode-cancel">Vazgeç</button>
+        </div>
+        <div class="map-scroll">
+          <div id="grid"></div>
+        </div>
+        <div class="map-hint" id="map-hint">Bir karaktere dokun, ne yapmak istediğini seç.</div>
+
+        <div class="dice-panel">
+          <h3 class="sheet-section-title">ZAR AT</h3>
+          <div class="dice-char-row" id="dice-char-row"></div>
+          <div id="dice-roll-area"></div>
+        </div>
+      </div>
+
+      <div id="chars-tab">
+        <div id="char-list"></div>
+        <button class="add-char-btn" id="btn-add-char" style="display:none;">+ Karakter Ekle</button>
+      </div>
+
+      <div id="inv-tab">
+        <div class="dice-char-row" id="inv-char-row"></div>
+        <div id="inv-list"></div>
+        <button class="add-char-btn" id="btn-add-item" style="display:none;">+ Eşya Ekle</button>
+      </div>
+
+      <div id="creatures-tab">
+        <div id="creature-list"></div>
+        <button class="add-char-btn" id="btn-add-creature">+ Yaratık Ekle</button>
+      </div>
+    </div>
+
+    <div class="tabbar">
+      <button id="tab-btn-map" class="active"><span class="ic">⚔</span>Aksiyon</button>
+      <button id="tab-btn-chars"><span class="ic">🛡</span>Karakterler</button>
+      <button id="tab-btn-inv"><span class="ic">🎒</span>Envanter</button>
+      <button id="tab-btn-creatures" style="display:none;"><span class="ic">🐉</span>Yaratıklar</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ADD CHARACTER MODAL -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <h3>Yeni Karakter</h3>
+    <div class="field"><label>İsim</label><input id="mc-name" type="text" maxlength="16"></div>
+    <p style="color:var(--text-dim); font-size:11px; margin:0;">Can, mana ve hız; seviyeye ve özelliklere göre kendiliğinden hesaplanacak — karakter kağıdından ayarlayabilirsin.</p>
+    <div class="field">
+      <label>Renk</label>
+      <div class="color-row" id="mc-colors"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="ghost-btn" id="mc-cancel">Vazgeç</button>
+      <button class="primary-btn" id="mc-save">Ekle</button>
+    </div>
+  </div>
+</div>
+
+<!-- ACTION MENU (map) -->
+<div class="modal-backdrop" id="action-menu-backdrop">
+  <div class="modal">
+    <h3 id="action-menu-title">Aksiyon</h3>
+    <button class="action-menu-btn" id="am-walk">🚶 Yürü</button>
+    <button class="action-menu-btn" id="am-melee">⚔ Düz Vur</button>
+    <button class="action-menu-btn" id="am-ability">✨ Yetenek Kullan</button>
+    <button class="action-menu-btn" id="am-item">🎒 Eşya Kullan</button>
+    <button class="ghost-btn" id="am-cancel">Vazgeç</button>
+  </div>
+</div>
+
+<!-- GENERIC PICKER (abilities / items) -->
+<div class="modal-backdrop" id="picker-backdrop">
+  <div class="modal">
+    <h3 id="picker-title">Seç</h3>
+    <div id="picker-list"></div>
+    <button class="ghost-btn" id="picker-cancel">Vazgeç</button>
+  </div>
+</div>
+
+<!-- ADD ITEM MODAL -->
+<div class="modal-backdrop" id="item-modal-backdrop">
+  <div class="modal">
+    <h3>Yeni Eşya</h3>
+    <div class="field"><label>Eşya Adı</label><input id="ni-name" type="text" maxlength="30"></div>
+    <div class="field"><label>Etiket</label><input id="ni-tag" type="text" maxlength="20" placeholder="ör. Kullanılabilir, Pasif, Zırh…"></div>
+    <p style="color:var(--text-dim); font-size:11px; margin:0;">"Kullanılabilir" etiketli eşyalar, Aksiyon menüsündeki "Eşya Kullan" seçeneğinde listelenir.</p>
+    <div class="modal-actions">
+      <button class="ghost-btn" id="ni-cancel">Vazgeç</button>
+      <button class="primary-btn" id="ni-save">Ekle</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD CREATURE MODAL -->
+<div class="modal-backdrop" id="creature-modal-backdrop">
+  <div class="modal">
+    <h3>Yeni Yaratık</h3>
+    <div class="field"><label>İsim</label><input id="cr-name" type="text" maxlength="20"></div>
+    <div class="field-row">
+      <div class="field"><label>Fiziksel AC</label><input id="cr-acphys" type="number" value="5"></div>
+      <div class="field"><label>Büyüsel AC</label><input id="cr-acmag" type="number" value="5"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Maksimum Can</label><input id="cr-maxhp" type="number" value="10" min="1"></div>
+      <div class="field"><label>Maksimum Mana</label><input id="cr-maxmp" type="number" value="0" min="0"></div>
+    </div>
+    <div class="field">
+      <label>Renk</label>
+      <div class="color-row" id="cr-colors"></div>
+    </div>
+    <p style="color:var(--text-dim); font-size:11px; margin:0;">Saldırı yeteneklerini ve özellik değerlerini, yaratık listesinden karta dokunarak açacağın kağıttan ekleyebilirsin.</p>
+    <div class="modal-actions">
+      <button class="ghost-btn" id="cr-cancel">Vazgeç</button>
+      <button class="primary-btn" id="cr-save">Ekle</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHARACTER SHEET -->
+<div class="sheet-overlay" id="sheet-screen">
+  <div class="sheet-header">
+    <button id="sheet-back">‹ Geri</button>
+    <div class="sheet-header-title">KARAKTER KAĞIDI</div>
+    <div style="width:40px"></div>
+  </div>
+  <div class="sheet-body">
+    <div class="sheet-top">
+      <div class="portrait-wrap" id="portrait-wrap">
+        <img id="sheet-portrait-img" style="display:none;">
+        <span id="portrait-placeholder">+ Foto</span>
+      </div>
+      <input type="file" id="portrait-input" accept="image/*" style="display:none;">
+      <div class="sheet-top-fields">
+        <div class="field"><label>İsim</label><input id="sheet-name" type="text"></div>
+        <div class="field-row">
+          <div class="field"><label>Sınıf</label><input id="sheet-class" type="text" placeholder="ör. Savaşçı"></div>
+          <div class="field"><label>Seviye</label><input id="sheet-level" type="number" min="1"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="char-stat-block">
+      <div class="stat-summary">
+        <div class="stat-box"><label>Maks Can</label><div id="calc-maxhp">-</div></div>
+        <div class="stat-box"><label>Maks Mana</label><div id="calc-maxmp">-</div></div>
+        <div class="stat-box"><label>Hız</label><div id="calc-speed">-</div></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Can Bonusu</label><input id="sheet-hpbonus" type="number"></div>
+        <div class="field"><label>Mana Bonusu</label><input id="sheet-manabonus" type="number"></div>
+      </div>
+      <p class="calc-hint">Maks Can = Seviye + Direnç + Can Bonusu · Maks Mana = Seviye + İrade + Mana Bonusu · Hız = 2 + (Çeviklik ÷ 2)</p>
+    </div>
+
+    <div id="creature-stat-block" style="display:none;">
+      <div class="field-row">
+        <div class="field"><label>Maksimum Can</label><input id="sheet-fixedhp" type="number" min="1"></div>
+        <div class="field"><label>Maksimum Mana</label><input id="sheet-fixedmp" type="number" min="0"></div>
+      </div>
+    </div>
+
+    <h3 class="sheet-section-title" style="margin-top:22px;">SAVAŞ AYARLARI</h3>
+    <div id="melee-settings-row" class="field-row">
+      <div class="field"><label>Düz Vuruş Menzili</label><input id="sheet-meleerange" type="number" min="1"></div>
+      <div class="field"><label>Düz Hasar Bonusu</label><input id="sheet-meleedmg" type="number"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Fiziksel AC</label><input id="sheet-acphys" type="number"></div>
+      <div class="field"><label>Büyüsel AC</label><input id="sheet-acmag" type="number"></div>
+    </div>
+    <p class="calc-hint" id="melee-calc-hint">Düz Vuruş Hasarı = 1 + Düz Hasar Bonusu · Menzil 1 ise Yakın Dövüş, 2+ ise Atıcılık zarı atılır.</p>
+
+    <h3 class="sheet-section-title" style="margin-top:22px;" id="abilities-header">YETENEKLER</h3>
+    <div id="abilities-list"></div>
+    <button class="ghost-btn" id="btn-add-ability">+ Yeni Yetenek Ekle</button>
+
+    <h3 class="sheet-section-title" style="margin-top:22px;">ÖZELLİKLER</h3>
+    <div id="skills-list"></div>
+    <button class="ghost-btn" id="btn-add-skill">+ Yeni Alan Ekle</button>
+  </div>
+</div>
+
+<div class="roll-toast" id="roll-toast">
+  <div class="big" id="roll-toast-big">-</div>
+  <div class="sub" id="roll-toast-sub"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCugLxFI0angr9U8yFRsyKXuNjyCNFoEhU",
+    authDomain: "veldora-5b010.firebaseapp.com",
+    databaseURL: "https://veldora-5b010-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "veldora-5b010",
+    storageBucket: "veldora-5b010.firebasestorage.app",
+    messagingSenderId: "460314147986",
+    appId: "1:460314147986:web:da902de3350fb6921fba4b",
+    measurementId: "G-H89FGVWT6P"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const fbDb = firebase.database();
+</script>
+<script>
+(function(){
+  const COLORS = ['#c1440e','#c99a3f','#5a7fa6','#6f8f5a','#9a5aa6','#a65a5a','#5aa69f','#8a8a8a'];
+  const COLS = 10, ROWS = 8;
+  const CELL = Math.floor(Math.min(window.innerWidth - 60, 520) / COLS);
+  const DEFAULT_SKILLS = [
+    ['AKADEMİ','BLG'], ['PAZARLIK','HNR'], ['ÇEVİKLİK','FZK'], ['SİMYA','BLG'],
+    ['GİZLİLİK','HNR'], ['KONTAKLAR','BLG'], ['ÜRETİM','BLG'], ['EMPATİ','HNR'],
+    ['YAKIN DÖVÜŞ','FZK'], ['SEZGİ','HNR'], ['DİRENÇ','FZK'], ['İRADE','FZK'],
+    ['DOĞA / HAYVAN','BLG'], ['ATICILIK','FZK'], ['EL ÇABUKLUĞU','HNR'],
+    ['İKNA / MUHABBET','HNR'], ['YALAN / ALDATMA','HNR'], ['İLİM','BLG'], ['HİS','HNR']
+  ];
+  function defaultSheet(){
+    const skills = DEFAULT_SKILLS.map(([label,cat]) => ({label, category:cat, value:0}));
+    skills.push({label:'', category:'', value:0});
+    skills.push({label:'', category:'', value:0});
+    skills.push({label:'', category:'', value:0});
+    return {
+      className:'', level:1, portrait:null, hpBonus:0, manaBonus:0, skills,
+      meleeRange:1, meleeDamageBonus:0, acPhysical:5, acMagical:5, abilities:[],
+      fixedMaxHp:null, fixedMaxMp:null
+    };
+  }
+
+  // Türetilmiş istatistikler: bunlar hiçbir zaman ayrı saklanmaz, her zaman anlık hesaplanır
+  function findSkillValue(t, label){
+    const skills = (t.sheet && t.sheet.skills) || [];
+    const s = skills.find(sk => (sk.label||'').trim().toUpperCase() === label);
+    return s ? (parseInt(s.value)||0) : 0;
+  }
+  function getMaxHp(t){
+    if(t.kind==='creature' && t.sheet && t.sheet.fixedMaxHp != null) return Math.max(1, t.sheet.fixedMaxHp);
+    const level = (t.sheet && t.sheet.level) || 1;
+    const direnc = findSkillValue(t, 'DİRENÇ');
+    const bonus = (t.sheet && t.sheet.hpBonus) || 0;
+    return Math.max(1, level + direnc + bonus);
+  }
+  function getMaxMp(t){
+    if(t.kind==='creature' && t.sheet && t.sheet.fixedMaxMp != null) return Math.max(0, t.sheet.fixedMaxMp);
+    const level = (t.sheet && t.sheet.level) || 1;
+    const irade = findSkillValue(t, 'İRADE');
+    const bonus = (t.sheet && t.sheet.manaBonus) || 0;
+    return Math.max(0, level + irade + bonus);
+  }
+  function getSpeed(t){
+    const cevik = findSkillValue(t, 'ÇEVİKLİK');
+    return 2 + Math.floor(cevik/2);
+  }
+  function clampCurrentStats(t){
+    t.hp = Math.max(0, Math.min(t.hp, getMaxHp(t)));
+    t.mp = Math.max(0, Math.min(t.mp==null ? getMaxMp(t) : t.mp, getMaxMp(t)));
+  }
+
+  let me = { name:'', role:'player', code:'' };
+  let session = null; // shared state
+  let actingTokenId = null;  // aksiyon menüsünü açan / hedef seçimi bekleyen karakter
+  let actionMode = null;     // null | 'walk' | 'melee' | 'ability'
+  let pendingAbility = null; // actionMode === 'ability' iken seçilen yetenek
+  let currentSheetTokenId = null;
+
+  const $ = id => document.getElementById(id);
+
+  // ---------- Setup screen wiring ----------
+  $('role-dm').onclick = () => setRole('dm');
+  $('role-player').onclick = () => setRole('player');
+  function setRole(r){
+    me.role = r;
+    $('role-dm').classList.toggle('active', r==='dm');
+    $('role-player').classList.toggle('active', r==='player');
+  }
+
+  $('btn-create').onclick = async () => {
+    const name = $('in-name').value.trim();
+    if(!name){ setupError('Önce adını yaz.'); return; }
+    if(typeof firebase === 'undefined' || !fbDb){ setupError('Veritabanına bağlanılamadı — internet bağlantını kontrol et.'); return; }
+    const code = genCode();
+    me.name = name; me.code = code; me.role = 'dm'; // oda kuran kişi Zindan Ustası olur
+    const fresh = { code, tokens:[], activeTokenId:null, rollLog:[], updatedAt: Date.now() };
+    try{
+      await fbDb.ref('sessions/'+code).set(fresh);
+      session = fresh;
+      enterMain();
+    }catch(e){ setupError('Oda oluşturulamadı: ' + (e && e.message ? e.message : e)); }
+  };
+
+  $('btn-join').onclick = async () => {
+    const name = $('in-name').value.trim();
+    const code = $('in-code').value.trim().toUpperCase();
+    if(!name){ setupError('Önce adını yaz.'); return; }
+    if(!code){ setupError('Oda kodunu gir.'); return; }
+    try{
+      const snap = await fbDb.ref('sessions/'+code).once('value');
+      const remote = snap.val();
+      if(!remote){ setupError('Bu kodda bir oda bulunamadı.'); return; }
+      me.name = name; me.code = code;
+      session = remote;
+      enterMain();
+    }catch(e){ setupError('Bu kodda bir oda bulunamadı: ' + (e && e.message ? e.message : e)); }
+  };
+
+  function setupError(msg){ $('setup-status').textContent = msg; }
+  function genCode(){
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let c=''; for(let i=0;i<4;i++) c += chars[Math.floor(Math.random()*chars.length)];
+    return c;
+  }
+
+  // ---------- Enter main app ----------
+  function enterMain(){
+    $('setup-screen').style.display = 'none';
+    $('main-screen').style.display = 'flex';
+    $('hdr-code').textContent = me.code;
+    $('hdr-role').textContent = me.role === 'dm' ? 'ZİNDAN USTASI' : 'OYUNCU · ' + me.name;
+    $('btn-add-char').style.display = me.role === 'dm' ? 'block' : 'none';
+    $('btn-export').style.display = me.role === 'dm' ? 'inline-block' : 'none';
+    $('btn-import').style.display = me.role === 'dm' ? 'inline-block' : 'none';
+    $('tab-btn-creatures').style.display = me.role === 'dm' ? 'flex' : 'none';
+
+    $('grid').style.width = (COLS*CELL)+'px';
+    $('grid').style.height = (ROWS*CELL)+'px';
+    $('grid').style.backgroundSize = CELL+'px '+CELL+'px';
+
+    renderAll();
+    attachRealtimeListener();
+  }
+
+  $('btn-leave').onclick = () => {
+    detachRealtimeListener();
+    location.reload();
+  };
+
+  // ---------- Backup: export / import ----------
+  $('btn-export').onclick = () => {
+    const data = JSON.stringify(session, null, 2);
+    const blob = new Blob([data], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const d = new Date();
+    const stamp = d.getFullYear()+''+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0');
+    a.href = url;
+    a.download = 'savas-yedek-'+me.code+'-'+stamp+'.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  $('btn-import').onclick = () => $('import-input').click();
+  $('import-input').onchange = (ev) => {
+    const file = ev.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(!parsed || !Array.isArray(parsed.tokens)){ alert('Bu dosya geçerli bir yedek gibi görünmüyor.'); return; }
+        parsed.code = me.code; // her zaman mevcut odanın koduyla kaydet
+        session = parsed;
+        await pushRemote();
+        renderAll();
+        alert('Yedek başarıyla yüklendi.');
+      }catch(e){ alert('Dosya okunamadı: ' + (e && e.message ? e.message : e)); }
+    };
+    reader.readAsText(file);
+    ev.target.value = '';
+  };
+
+  // ---------- Tabs ----------
+  $('tab-btn-map').onclick = () => switchTab('map');
+  $('tab-btn-chars').onclick = () => switchTab('chars');
+  $('tab-btn-inv').onclick = () => switchTab('inv');
+  $('tab-btn-creatures').onclick = () => switchTab('creatures');
+  function switchTab(t){
+    $('map-tab').classList.toggle('active', t==='map');
+    $('chars-tab').classList.toggle('active', t==='chars');
+    $('inv-tab').classList.toggle('active', t==='inv');
+    $('creatures-tab').classList.toggle('active', t==='creatures');
+    $('tab-btn-map').classList.toggle('active', t==='map');
+    $('tab-btn-chars').classList.toggle('active', t==='chars');
+    $('tab-btn-inv').classList.toggle('active', t==='inv');
+    $('tab-btn-creatures').classList.toggle('active', t==='creatures');
+    if(t==='map') renderDicePanel();
+    if(t==='inv') renderInventoryTab();
+    if(t==='creatures') renderCreatureList();
+  }
+
+  function esc(s){
+    return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---------- Sync (Firebase Realtime Database) ----------
+  let pendingRemote = null;
+
+  function getSessionRef(){ return fbDb.ref('sessions/'+me.code); }
+
+  async function pushRemote(){
+    session.updatedAt = Date.now();
+    try{
+      await getSessionRef().set(session);
+    }catch(e){ /* best effort */ }
+  }
+
+  function attachRealtimeListener(){
+    getSessionRef().on('value', (snap) => {
+      const remote = snap.val();
+      if(!remote) return;
+      if(remote.updatedAt === session.updatedAt) return; // kendi yazdığımızın yankısı, atla
+      if(currentSheetTokenId){
+        pendingRemote = remote; // karakter sayfası açıkken uygulamayı ertele
+        return;
+      }
+      session = remote;
+      renderAll();
+    });
+  }
+
+  function detachRealtimeListener(){
+    try{ getSessionRef().off(); }catch(e){}
+  }
+
+  function applyPendingRemote(){
+    if(pendingRemote){ session = pendingRemote; pendingRemote = null; renderAll(); }
+  }
+
+  function ensureTokenDefaults(t){
+    if(!t.sheet) t.sheet = defaultSheet();
+    if(t.sheet.hpBonus == null) t.sheet.hpBonus = 0;
+    if(t.sheet.manaBonus == null) t.sheet.manaBonus = 0;
+    if(t.sheet.meleeRange == null) t.sheet.meleeRange = 1;
+    if(t.sheet.meleeDamageBonus == null) t.sheet.meleeDamageBonus = 0;
+    if(t.sheet.acPhysical == null) t.sheet.acPhysical = 5;
+    if(t.sheet.acMagical == null) t.sheet.acMagical = 5;
+    if(!t.sheet.abilities) t.sheet.abilities = [];
+    if(!t.inventory) t.inventory = [];
+    if(!t.kind) t.kind = 'character';
+    if(t.inBattle == null) t.inBattle = (t.kind === 'character');
+    if(t.hp == null) t.hp = getMaxHp(t);
+    if(t.mp == null) t.mp = getMaxMp(t);
+  }
+
+  // ---------- Render ----------
+  function renderAll(){
+    session.tokens.forEach(ensureTokenDefaults);
+    if(!session.rollLog) session.rollLog = [];
+    renderTurnBanner();
+    renderGrid();
+    renderCharList();
+    renderRollLog();
+    renderDicePanel();
+    if($('inv-tab').classList.contains('active')) renderInventoryTab();
+    if($('creatures-tab').classList.contains('active')) renderCreatureList();
+  }
+
+  function renderRollLog(){
+    const wrap = $('roll-log');
+    wrap.innerHTML = '';
+    (session.rollLog||[]).slice(0,10).forEach(r => {
+      const chip = document.createElement('div');
+      chip.className = 'roll-chip' + (r.roll===20?' crit20':'') + (r.roll===1?' crit1':'');
+      if(r.combat){
+        const label = r.skillLabel ? (' ('+r.skillLabel+')') : '';
+        const outcome = r.hit ? ('İSABET · '+r.dmg+' hasar') : 'ISKALADI';
+        chip.innerHTML = esc(r.charName) + ' → ' + esc(r.targetName) + ': <b>' + r.roll + (r.bonus?(' +'+r.bonus):'') + ' = ' + r.total + '</b>' + esc(label) + ' vs AC ' + r.ac + ' — ' + outcome;
+      } else if(r.itemUse){
+        chip.innerHTML = esc(r.charName) + ': <b>' + esc(r.itemName) + '</b> kullanıldı';
+      } else {
+        const label = r.skillLabel ? (' ('+r.skillLabel+')') : '';
+        chip.innerHTML = esc(r.charName) + ': <b>' + r.roll + (r.bonus ? ' +'+r.bonus+' = '+r.total : '') + '</b>' + esc(label);
+      }
+      wrap.appendChild(chip);
+    });
+  }
+
+  function renderTurnBanner(){
+    const active = session.tokens.find(t => t.id === session.activeTokenId);
+    if(active){
+      $('turn-banner').innerHTML = 'Sıra: <b>'+esc(active.name)+'</b>' + (me.role==='dm' ? ' — <span style="text-decoration:underline;cursor:pointer" id="end-turn-link">sırayı geç</span>' : '');
+      const link = document.getElementById('end-turn-link');
+      if(link) link.onclick = endTurn;
+    } else {
+      $('turn-banner').innerHTML = me.role==='dm'
+        ? 'Savaş başlamadı — <span style="text-decoration:underline;cursor:pointer" id="end-turn-link">sırayı başlat</span>'
+        : 'Zindan Ustası sırayı henüz başlatmadı.';
+      const link = document.getElementById('end-turn-link');
+      if(link) link.onclick = endTurn;
+    }
+  }
+
+  async function endTurn(){
+    if(me.role !== 'dm') return;
+    const active = session.tokens.filter(t => t.kind!=='creature' || t.inBattle);
+    if(active.length === 0) return;
+    const ids = active.map(t=>t.id);
+    const curIdx = ids.indexOf(session.activeTokenId);
+    session.activeTokenId = ids[(curIdx+1) % ids.length];
+    await pushRemote();
+    renderAll();
+  }
+
+  function renderGrid(){
+    const grid = $('grid');
+    grid.querySelectorAll('.token, .cell-range').forEach(el => el.remove());
+
+    const actor = session.tokens.find(t => t.id === actingTokenId);
+
+    // walk mode: highlight reachable empty cells
+    if(actor && actionMode==='walk' && canControl(actor)){
+      for(let r=0;r<ROWS;r++){
+        for(let c=0;c<COLS;c++){
+          const dist = Math.max(Math.abs(r-actor.row), Math.abs(c-actor.col));
+          const occupied = session.tokens.some(t => t.row===r && t.col===c && t.id!==actor.id && (t.kind!=='creature' || t.inBattle));
+          if(dist>0 && dist<=getSpeed(actor) && !occupied){
+            const cell = document.createElement('div');
+            cell.className = 'cell-range';
+            cell.style.left = (c*CELL)+'px'; cell.style.top = (r*CELL)+'px';
+            cell.style.width = CELL+'px'; cell.style.height = CELL+'px';
+            cell.onclick = () => moveToken(actor.id, r, c);
+            grid.appendChild(cell);
+          }
+        }
+      }
+    }
+
+    // melee/ability mode: figure out which tokens are valid targets, and tint the whole range area
+    let targetRange = 0, isAbilityMode = false;
+    if(actor && actionMode==='melee'){ targetRange = actor.sheet.meleeRange || 1; }
+    if(actor && actionMode==='ability' && pendingAbility){ targetRange = pendingAbility.range || 1; isAbilityMode = true; }
+
+    if(actor && targetRange>0){
+      for(let r=0;r<ROWS;r++){
+        for(let c=0;c<COLS;c++){
+          const dist = Math.max(Math.abs(r-actor.row), Math.abs(c-actor.col));
+          if(dist>0 && dist<=targetRange){
+            const cell = document.createElement('div');
+            cell.className = 'cell-range' + (isAbilityMode ? ' ability-tint' : ' melee-tint');
+            cell.style.left = (c*CELL)+'px'; cell.style.top = (r*CELL)+'px';
+            cell.style.width = CELL+'px'; cell.style.height = CELL+'px';
+            grid.appendChild(cell);
+          }
+        }
+      }
+    }
+
+    session.tokens.filter(t => t.kind!=='creature' || t.inBattle).forEach(t => {
+      const el = document.createElement('div');
+      let isTarget = false;
+      if(actor && targetRange>0 && t.id!==actor.id){
+        const dist = Math.max(Math.abs(t.row-actor.row), Math.abs(t.col-actor.col));
+        isTarget = dist<=targetRange;
+      }
+      el.className = 'token'
+        + (t.id===actingTokenId && (actionMode==='walk') ? ' selected':'')
+        + (t.id===session.activeTokenId ? ' active-turn':'')
+        + (isTarget ? ' can-target' + (isAbilityMode?' ability-target':'') : '');
+      el.style.width = (CELL-8)+'px'; el.style.height = (CELL-8)+'px';
+      el.style.left = (t.col*CELL+4)+'px'; el.style.top = (t.row*CELL+4)+'px';
+      el.style.background = t.color;
+      el.textContent = t.name.slice(0,2).toUpperCase();
+      el.title = t.name;
+      const bar = document.createElement('div');
+      bar.className = 'hp-bar-mini';
+      const fill = document.createElement('i');
+      fill.style.width = Math.max(0, Math.min(100, (t.hp/getMaxHp(t))*100)) + '%';
+      fill.style.background = hpColor(t.hp/getMaxHp(t));
+      bar.appendChild(fill);
+      el.appendChild(bar);
+      el.onclick = (ev) => { ev.stopPropagation(); onTokenTap(t, isTarget); };
+      grid.appendChild(el);
+    });
+
+    updateModeBanner();
+  }
+
+  function updateModeBanner(){
+    const banner = $('mode-banner');
+    const hint = $('map-hint');
+    if(actionMode==='walk'){
+      banner.classList.add('show');
+      $('mode-banner-text').textContent = 'Yürü: gitmek istediğin kareye dokun';
+      hint.style.display = 'none';
+    } else if(actionMode==='melee'){
+      banner.classList.add('show');
+      $('mode-banner-text').textContent = 'Düz Vur: hedefine dokun';
+      hint.style.display = 'none';
+    } else if(actionMode==='ability'){
+      banner.classList.add('show');
+      $('mode-banner-text').textContent = (pendingAbility ? pendingAbility.name || 'Yetenek' : 'Yetenek') + ': hedefine dokun';
+      hint.style.display = 'none';
+    } else {
+      banner.classList.remove('show');
+      hint.style.display = 'block';
+      hint.textContent = 'Bir karaktere dokun, ne yapmak istediğini seç.';
+    }
+  }
+
+  $('mode-cancel').onclick = () => { cancelActionMode(); };
+  function cancelActionMode(){
+    actionMode = null; actingTokenId = null; pendingAbility = null;
+    renderGrid();
+  }
+
+  function onTokenTap(t, isTarget){
+    if(actionMode==='melee' && isTarget){ resolveMeleeAttack(session.tokens.find(x=>x.id===actingTokenId), t); return; }
+    if(actionMode==='ability' && isTarget && pendingAbility){ resolveAbility(session.tokens.find(x=>x.id===actingTokenId), t, pendingAbility); return; }
+    if(actionMode){ return; } // bir mod açıkken hedef olmayan bir karaktere dokunmayı yoksay
+    if(!canControl(t)) return;
+    openActionMenu(t);
+  }
+
+  function canControl(t){
+    return me.role === 'dm' || t.owner === me.name;
+  }
+
+  async function moveToken(id, row, col){
+    const t = session.tokens.find(x=>x.id===id);
+    if(!t) return;
+    t.row = row; t.col = col;
+    actionMode = null; actingTokenId = null;
+    await pushRemote();
+    renderGrid();
+    flashToken(id);
+  }
+
+  function flashToken(id){
+    setTimeout(() => {
+      const grid = $('grid');
+      const idx = session.tokens.findIndex(t=>t.id===id);
+      if(idx<0) return;
+      const els = grid.querySelectorAll('.token');
+      const t = session.tokens[idx];
+      els.forEach(el => {
+        if(parseInt(el.style.left)===t.col*CELL+4 && parseInt(el.style.top)===t.row*CELL+4){
+          el.style.transform = 'scale(1.18)';
+          setTimeout(()=>{ el.style.transform=''; }, 160);
+        }
+      });
+    }, 290);
+  }
+
+  // ---------- Action menu ----------
+  function openActionMenu(t){
+    actingTokenId = t.id;
+    $('action-menu-title').textContent = t.name;
+    $('am-melee').style.display = t.kind==='creature' ? 'none' : 'block';
+    $('action-menu-backdrop').classList.add('open');
+  }
+  function closeActionMenu(){ $('action-menu-backdrop').classList.remove('open'); }
+  $('am-cancel').onclick = () => { closeActionMenu(); actingTokenId = null; };
+  $('am-walk').onclick = () => { actionMode='walk'; closeActionMenu(); renderGrid(); };
+  $('am-melee').onclick = () => { actionMode='melee'; closeActionMenu(); renderGrid(); };
+  $('am-ability').onclick = () => {
+    const t = session.tokens.find(x=>x.id===actingTokenId);
+    closeActionMenu();
+    if(!t) return;
+    openAbilityPicker(t);
+  };
+  $('am-item').onclick = () => {
+    const t = session.tokens.find(x=>x.id===actingTokenId);
+    closeActionMenu();
+    if(!t) return;
+    openItemPicker(t);
+  };
+
+  // ---------- Generic picker modal ----------
+  function openPicker(title, options, onPick, emptyMsg){
+    $('picker-title').textContent = title;
+    const list = $('picker-list');
+    list.innerHTML = '';
+    if(options.length === 0){
+      const p = document.createElement('p');
+      p.className='map-hint'; p.style.marginTop='0'; p.textContent = emptyMsg;
+      list.appendChild(p);
+    }
+    options.forEach(opt => {
+      const b = document.createElement('button');
+      b.className = 'action-menu-btn';
+      b.innerHTML = opt.label;
+      b.disabled = !!opt.disabled;
+      if(opt.disabled) b.style.opacity = '.5';
+      b.onclick = () => { $('picker-backdrop').classList.remove('open'); onPick(opt.value); };
+      list.appendChild(b);
+    });
+    $('picker-backdrop').classList.add('open');
+  }
+  $('picker-cancel').onclick = () => { $('picker-backdrop').classList.remove('open'); actingTokenId = null; };
+
+  function openAbilityPicker(t){
+    const abilities = (t.sheet.abilities||[]).filter(a => (a.name||'').trim());
+    const opts = abilities.map(a => ({
+      label: '<b>'+esc(a.name)+'</b> <span class="n">'+a.manaCost+' mana · menzil '+a.range+'</span>',
+      value: a,
+      disabled: (t.mp||0) < (a.manaCost||0)
+    }));
+    openPicker('Yetenek Seç', opts, (ability) => {
+      pendingAbility = ability;
+      actionMode = 'ability';
+      renderGrid();
+    }, 'Bu karakterin tanımlı bir yeteneği yok. Karakter kağıdından ekleyebilirsin.');
+  }
+
+  function openItemPicker(t){
+    const items = (t.inventory||[]).filter(i => (i.tag||'').trim().toLocaleUpperCase('tr') === 'KULLANILABİLİR');
+    const opts = items.map(i => ({ label: '<b>'+esc(i.name)+'</b>', value: i }));
+    openPicker('Eşya Kullan', opts, (item) => {
+      resolveItemUse(t, item);
+    }, 'Kullanılabilir etiketli eşyası yok.');
+    actingTokenId = t.id;
+  }
+
+  function hpColor(frac){
+    if(frac > .5) return 'var(--ok)';
+    if(frac > .2) return 'var(--gold)';
+    return 'var(--ember)';
+  }
+
+  function renderCharList(){
+    const wrap = $('char-list');
+    wrap.innerHTML = '';
+    const characters = session.tokens.filter(t => t.kind !== 'creature');
+    if(characters.length === 0){
+      const p = document.createElement('p');
+      p.style.color = 'var(--text-dim)'; p.style.fontSize='13px'; p.style.textAlign='center';
+      p.textContent = me.role==='dm' ? 'Henüz karakter yok. Aşağıdan ekleyebilirsin.' : 'Zindan Ustası henüz karakter eklemedi.';
+      wrap.appendChild(p);
+    }
+    characters.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'char-card' + (t.owner===me.name ? ' mine':'');
+      card.onclick = () => openSheet(t.id);
+
+      const av = document.createElement('div');
+      av.className = 'char-avatar'; av.style.background = t.color; av.textContent = t.name.slice(0,2).toUpperCase();
+
+      const info = document.createElement('div');
+      info.className = 'char-info';
+      const nameRow = document.createElement('div');
+      nameRow.className = 'name';
+      nameRow.textContent = t.name;
+      const ownerLine = document.createElement('div');
+      ownerLine.className = 'owner';
+      ownerLine.textContent = t.owner ? ('Sahibi: '+t.owner) : 'Sahipsiz';
+      info.appendChild(nameRow); info.appendChild(ownerLine);
+
+      function buildStatRow(statKey, maxVal, colorFn){
+        const row = document.createElement('div');
+        row.className = 'hp-row';
+        const track = document.createElement('div'); track.className='hp-track';
+        const fill = document.createElement('i');
+        const cur = t[statKey] || 0;
+        fill.style.width = Math.max(0, Math.min(100, maxVal ? (cur/maxVal)*100 : 0)) + '%';
+        fill.style.background = colorFn(maxVal ? cur/maxVal : 0);
+        track.appendChild(fill);
+
+        if(me.role==='dm'){
+          const numInp = document.createElement('input');
+          numInp.type = 'number'; numInp.className = 'hp-num-input'; numInp.value = cur;
+          numInp.onclick = (ev) => ev.stopPropagation();
+          numInp.onchange = (ev) => {
+            ev.stopPropagation();
+            setStatExact(t.id, statKey, parseInt(numInp.value)||0);
+          };
+          const maxLbl = document.createElement('span'); maxLbl.className='hp-num'; maxLbl.textContent = ' / '+maxVal;
+          const wrap2 = document.createElement('div'); wrap2.style.display='flex'; wrap2.style.alignItems='center'; wrap2.style.gap='2px';
+          wrap2.appendChild(numInp); wrap2.appendChild(maxLbl);
+          row.appendChild(track); row.appendChild(wrap2);
+        } else {
+          const num = document.createElement('div'); num.className='hp-num'; num.textContent = cur+' / '+maxVal;
+          row.appendChild(track); row.appendChild(num);
+        }
+
+        if(canControl(t)){
+          const btns = document.createElement('div'); btns.className='hp-btns';
+          const minus = document.createElement('button'); minus.textContent='–';
+          minus.onclick = (ev) => { ev.stopPropagation(); adjustStat(t.id, statKey, -1); };
+          const plus = document.createElement('button'); plus.textContent='+';
+          plus.onclick = (ev) => { ev.stopPropagation(); adjustStat(t.id, statKey, 1); };
+          btns.appendChild(minus); btns.appendChild(plus);
+          row.appendChild(btns);
+        }
+        return row;
+      }
+      info.appendChild(buildStatRow('hp', getMaxHp(t), hpColor));
+      info.appendChild(buildStatRow('mp', getMaxMp(t), () => 'var(--mana)'));
+      const speedLine = document.createElement('div');
+      speedLine.className = 'owner';
+      speedLine.textContent = 'Hız: ' + getSpeed(t) + ' kare';
+      info.appendChild(speedLine);
+
+      card.appendChild(av); card.appendChild(info);
+
+      if(me.role==='player' && !t.owner){
+        const claim = document.createElement('button');
+        claim.className='claim-btn'; claim.textContent='Bu benim';
+        claim.onclick = (ev) => { ev.stopPropagation(); claimToken(t.id); };
+        card.appendChild(claim);
+      }
+      if(me.role==='dm'){
+        const rm = document.createElement('button');
+        rm.className='rm-btn'; rm.textContent='✕';
+        rm.onclick = (ev) => { ev.stopPropagation(); removeToken(t.id); };
+        card.appendChild(rm);
+      }
+      wrap.appendChild(card);
+    });
+  }
+
+  async function adjustStat(id, stat, delta){
+    const t = session.tokens.find(x=>x.id===id);
+    if(!t) return;
+    const max = stat==='hp' ? getMaxHp(t) : getMaxMp(t);
+    t[stat] = Math.max(0, Math.min(max, (t[stat]||0) + delta));
+    await pushRemote();
+    renderCharList(); renderGrid();
+    if(stat==='hp') checkDeath(t);
+  }
+
+  async function setStatExact(id, stat, value){
+    const t = session.tokens.find(x=>x.id===id);
+    if(!t) return;
+    const max = stat==='hp' ? getMaxHp(t) : getMaxMp(t);
+    t[stat] = Math.max(0, Math.min(max, value||0));
+    await pushRemote();
+    renderCharList(); renderGrid();
+    if(stat==='hp') checkDeath(t);
+  }
+
+  function checkDeath(t){
+    if(t.kind==='creature' && t.inBattle && t.hp<=0){
+      playDeathAnimation(t.id);
+    }
+  }
+
+  function playDeathAnimation(id){
+    const t = session.tokens.find(x=>x.id===id);
+    if(!t) return;
+    const grid = $('grid');
+    grid.querySelectorAll('.token').forEach(el => {
+      if(parseInt(el.style.left)===t.col*CELL+4 && parseInt(el.style.top)===t.row*CELL+4){
+        el.classList.add('token-dying');
+      }
+    });
+    setTimeout(async () => {
+      t.inBattle = false;
+      await pushRemote();
+      renderAll();
+    }, 650);
+  }
+
+  async function claimToken(id){
+    const t = session.tokens.find(x=>x.id===id);
+    if(!t || t.owner) return;
+    t.owner = me.name;
+    await pushRemote();
+    renderCharList();
+    renderDicePanel();
+  }
+
+  async function removeToken(id){
+    session.tokens = session.tokens.filter(t=>t.id!==id);
+    if(session.activeTokenId===id) session.activeTokenId=null;
+    await pushRemote();
+    renderAll();
+    if($('creatures-tab').classList.contains('active')) renderCreatureList();
+  }
+
+  // ---------- Add character modal ----------
+  let mcColor = COLORS[0];
+  $('btn-add-char').onclick = () => openModal();
+  $('mc-cancel').onclick = () => closeModal();
+  function openModal(){
+    $('mc-name').value='';
+    const row = $('mc-colors'); row.innerHTML='';
+    mcColor = COLORS[session.tokens.length % COLORS.length];
+    COLORS.forEach(c => {
+      const sw = document.createElement('div');
+      sw.className='color-swatch' + (c===mcColor?' sel':'');
+      sw.style.background=c;
+      sw.onclick = () => { mcColor=c; row.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('sel')); sw.classList.add('sel'); };
+      row.appendChild(sw);
+    });
+    $('modal-backdrop').classList.add('open');
+  }
+  function closeModal(){ $('modal-backdrop').classList.remove('open'); }
+
+  $('mc-save').onclick = async () => {
+    const name = $('mc-name').value.trim();
+    if(!name) return;
+    const occupied = new Set(session.tokens.filter(x=>x.kind!=='creature'||x.inBattle).map(t=>t.row+','+t.col));
+    let row=0,col=0, placed=false;
+    for(let r=0;r<ROWS && !placed;r++){
+      for(let c=0;c<COLS && !placed;c++){
+        if(!occupied.has(r+','+c)){ row=r; col=c; placed=true; }
+      }
+    }
+    const newTok = {
+      id: 't'+Date.now()+Math.floor(Math.random()*999),
+      name, color:mcColor, row, col, owner:null,
+      sheet: defaultSheet(), hp:1, mp:1
+    };
+    newTok.hp = getMaxHp(newTok);
+    newTok.mp = getMaxMp(newTok);
+    session.tokens.push(newTok);
+    await pushRemote();
+    closeModal();
+    renderAll();
+  };
+
+  // ---------- Character sheet ----------
+  function getSheetToken(){ return session.tokens.find(t => t.id === currentSheetTokenId); }
+
+  function openSheet(id){
+    currentSheetTokenId = id;
+    const t = getSheetToken();
+    if(!t) return;
+    ensureTokenDefaults(t);
+    renderSheet(t);
+    $('sheet-screen').classList.add('open');
+  }
+
+  $('sheet-back').onclick = () => {
+    $('sheet-screen').classList.remove('open');
+    currentSheetTokenId = null;
+    renderCharList();
+    renderGrid();
+    applyPendingRemote(); // sheet açıkken ertelenen senkronizasyonu şimdi uygula
+  };
+
+  function renderSheet(t){
+    const editable = canControl(t);
+    const isCreature = t.kind === 'creature';
+    $('sheet-name').value = t.name;
+    $('sheet-class').value = t.sheet.className || '';
+    $('sheet-level').value = t.sheet.level || 1;
+    $('sheet-hpbonus').value = t.sheet.hpBonus || 0;
+    $('sheet-manabonus').value = t.sheet.manaBonus || 0;
+    $('sheet-meleerange').value = t.sheet.meleeRange || 1;
+    $('sheet-meleedmg').value = t.sheet.meleeDamageBonus || 0;
+    $('sheet-acphys').value = t.sheet.acPhysical != null ? t.sheet.acPhysical : 5;
+    $('sheet-acmag').value = t.sheet.acMagical != null ? t.sheet.acMagical : 5;
+    $('sheet-fixedhp').value = t.sheet.fixedMaxHp != null ? t.sheet.fixedMaxHp : getMaxHp(t);
+    $('sheet-fixedmp').value = t.sheet.fixedMaxMp != null ? t.sheet.fixedMaxMp : getMaxMp(t);
+    [$('sheet-name'), $('sheet-class'), $('sheet-level'), $('sheet-hpbonus'), $('sheet-manabonus'),
+     $('sheet-meleerange'), $('sheet-meleedmg'), $('sheet-acphys'), $('sheet-acmag'),
+     $('sheet-fixedhp'), $('sheet-fixedmp')].forEach(el => el.disabled = !editable);
+
+    $('char-stat-block').style.display = isCreature ? 'none' : 'block';
+    $('creature-stat-block').style.display = isCreature ? 'block' : 'none';
+    $('melee-settings-row').style.display = isCreature ? 'none' : 'flex';
+    $('melee-calc-hint').style.display = isCreature ? 'none' : 'block';
+    $('abilities-header').textContent = isCreature ? 'SALDIRI YETENEKLERİ' : 'YETENEKLER';
+
+    updateCalcDisplay(t);
+
+    const img = $('sheet-portrait-img'), ph = $('portrait-placeholder');
+    if(t.sheet.portrait){ img.src = t.sheet.portrait; img.style.display='block'; ph.style.display='none'; }
+    else{ img.style.display='none'; ph.style.display='block'; }
+    $('portrait-wrap').style.cursor = editable ? 'pointer' : 'default';
+
+    renderAbilitiesList(t, editable);
+
+    const list = $('skills-list');
+    list.innerHTML = '';
+    t.sheet.skills.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.className = 'skill-row';
+
+      const label = document.createElement('input');
+      label.className = 'skill-label'; label.type = 'text'; label.value = s.label;
+      label.placeholder = 'Alan adı';
+      label.disabled = !editable;
+      label.onchange = () => { s.label = label.value; recalcAndSave(t); renderAbilitiesList(t, editable); };
+
+      const cat = document.createElement('input');
+      cat.className = 'skill-cat'; cat.type = 'text'; cat.maxLength = 4; cat.value = s.category;
+      cat.placeholder = '—';
+      cat.disabled = !editable;
+      cat.onchange = () => { s.category = cat.value.toUpperCase(); cat.value = s.category; pushRemote(); };
+
+      const val = document.createElement('input');
+      val.className = 'skill-val'; val.type = 'number'; val.value = s.value;
+      val.disabled = !editable;
+      val.onchange = () => { s.value = parseInt(val.value)||0; val.value = s.value; recalcAndSave(t); };
+
+      row.appendChild(label); row.appendChild(cat); row.appendChild(val);
+      list.appendChild(row);
+    });
+    $('btn-add-skill').style.display = editable ? 'block' : 'none';
+  }
+
+  // ---------- Dice (Aksiyon sekmesi) ----------
+  let diceCharId = null;
+  function renderDicePanel(){
+    const mine = session.tokens.filter(t => canControl(t));
+    let sel = mine.find(t => t.id === diceCharId);
+    if(!sel){ sel = mine[0]; diceCharId = sel ? sel.id : null; }
+
+    const row = $('dice-char-row');
+    row.innerHTML = '';
+    mine.forEach(t => {
+      const b = document.createElement('button');
+      b.className = 'dice-char-chip' + (sel && t.id===sel.id ? ' active':'');
+      b.textContent = t.name;
+      b.onclick = () => { diceCharId = t.id; renderDicePanel(); };
+      row.appendChild(b);
+    });
+
+    const area = $('dice-roll-area');
+    area.innerHTML = '';
+    if(!sel){
+      const p = document.createElement('p');
+      p.className = 'map-hint'; p.style.marginTop = '0';
+      p.textContent = 'Zar atmak için önce kontrol ettiğin bir karakter olması lazım.';
+      area.appendChild(p);
+      return;
+    }
+    const d20btn = document.createElement('button');
+    d20btn.className = 'dice-btn'; d20btn.textContent = '🎲 Düz D20';
+    d20btn.onclick = () => performRoll(sel, null);
+    area.appendChild(d20btn);
+
+    const chips = document.createElement('div');
+    chips.className = 'dice-skills';
+    (sel.sheet ? sel.sheet.skills : []).filter(s => (s.label||'').trim()).forEach(s => {
+      const chip = document.createElement('button');
+      chip.className = 'dice-chip';
+      chip.innerHTML = esc(s.label) + '<span class="n">+'+(parseInt(s.value)||0)+'</span>';
+      chip.onclick = () => performRoll(sel, s);
+      chips.appendChild(chip);
+    });
+    area.appendChild(chips);
+  }
+
+  // ---------- Inventory tab ----------
+  let invCharId = null;
+  function renderInventoryTab(){
+    const mine = session.tokens.filter(t => canControl(t));
+    let sel = mine.find(t => t.id === invCharId);
+    if(!sel){ sel = mine[0]; invCharId = sel ? sel.id : null; }
+
+    const row = $('inv-char-row');
+    row.innerHTML = '';
+    mine.forEach(t => {
+      const b = document.createElement('button');
+      b.className = 'dice-char-chip' + (sel && t.id===sel.id ? ' active':'');
+      b.textContent = t.name;
+      b.onclick = () => { invCharId = t.id; renderInventoryTab(); };
+      row.appendChild(b);
+    });
+
+    const list = $('inv-list');
+    list.innerHTML = '';
+    $('btn-add-item').style.display = sel ? 'block' : 'none';
+    if(!sel){
+      const p = document.createElement('p');
+      p.className='map-hint'; p.style.marginTop='0';
+      p.textContent = 'Envanteri görüntülemek için kontrol ettiğin bir karakter olması lazım.';
+      list.appendChild(p);
+      return;
+    }
+    if((sel.inventory||[]).length === 0){
+      const p = document.createElement('p');
+      p.className='map-hint'; p.style.marginTop='0';
+      p.textContent = sel.name + ' için henüz eşya eklenmedi.';
+      list.appendChild(p);
+    }
+    (sel.inventory||[]).forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      const nm = document.createElement('div'); nm.className='item-name'; nm.textContent = item.name;
+      card.appendChild(nm);
+      if((item.tag||'').trim()){
+        const tag = document.createElement('span'); tag.className='item-tag'; tag.textContent = item.tag;
+        card.appendChild(tag);
+      }
+      const rm = document.createElement('button'); rm.className='rm-btn'; rm.textContent='✕';
+      rm.onclick = () => {
+        sel.inventory = sel.inventory.filter(i=>i.id!==item.id);
+        pushRemote(); renderInventoryTab();
+      };
+      card.appendChild(rm);
+      list.appendChild(card);
+    });
+  }
+
+  $('btn-add-item').onclick = () => {
+    if(!invCharId) return;
+    $('ni-name').value=''; $('ni-tag').value='';
+    $('item-modal-backdrop').classList.add('open');
+  };
+  $('ni-cancel').onclick = () => $('item-modal-backdrop').classList.remove('open');
+  $('ni-save').onclick = async () => {
+    const t = session.tokens.find(x=>x.id===invCharId);
+    if(!t) return;
+    const name = $('ni-name').value.trim();
+    if(!name) return;
+    t.inventory = t.inventory || [];
+    t.inventory.push({ id:'i'+Date.now()+Math.floor(Math.random()*999), name, tag: $('ni-tag').value.trim() });
+    $('item-modal-backdrop').classList.remove('open');
+    await pushRemote();
+    renderInventoryTab();
+  };
+
+  // ---------- Creatures (DM only) ----------
+  let crColor = COLORS[0];
+  function renderCreatureList(){
+    if(me.role !== 'dm') return;
+    const wrap = $('creature-list');
+    wrap.innerHTML = '';
+    const creatures = session.tokens.filter(t => t.kind === 'creature');
+    if(creatures.length === 0){
+      const p = document.createElement('p');
+      p.style.color='var(--text-dim)'; p.style.fontSize='13px'; p.style.textAlign='center';
+      p.textContent = 'Henüz yaratık yok. Aşağıdan ekleyebilirsin.';
+      wrap.appendChild(p);
+    }
+    creatures.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'char-card';
+      card.onclick = () => openSheet(t.id);
+
+      const av = document.createElement('div');
+      av.className = 'char-avatar'; av.style.background = t.color; av.textContent = t.name.slice(0,2).toUpperCase();
+
+      const info = document.createElement('div');
+      info.className = 'char-info';
+      const nameRow = document.createElement('div'); nameRow.className='name'; nameRow.textContent = t.name;
+      const statusLine = document.createElement('div'); statusLine.className='owner';
+      statusLine.textContent = t.inBattle ? 'Savaşta' : 'Sırada bekliyor';
+      info.appendChild(nameRow); info.appendChild(statusLine);
+
+      function buildRow(statKey, maxVal, colorFn){
+        const row = document.createElement('div'); row.className = 'hp-row';
+        const track = document.createElement('div'); track.className='hp-track';
+        const fill = document.createElement('i');
+        const cur = t[statKey]||0;
+        fill.style.width = Math.max(0, Math.min(100, maxVal ? (cur/maxVal)*100 : 0)) + '%';
+        fill.style.background = colorFn(maxVal ? cur/maxVal : 0);
+        track.appendChild(fill);
+        const numInp = document.createElement('input');
+        numInp.type='number'; numInp.className='hp-num-input'; numInp.value = cur;
+        numInp.onclick = (ev) => ev.stopPropagation();
+        numInp.onchange = (ev) => { ev.stopPropagation(); setStatExact(t.id, statKey, parseInt(numInp.value)||0); };
+        const maxLbl = document.createElement('span'); maxLbl.className='hp-num'; maxLbl.textContent=' / '+maxVal;
+        const wrap2 = document.createElement('div'); wrap2.style.display='flex'; wrap2.style.alignItems='center'; wrap2.style.gap='2px';
+        wrap2.appendChild(numInp); wrap2.appendChild(maxLbl);
+        row.appendChild(track); row.appendChild(wrap2);
+        return row;
+      }
+      info.appendChild(buildRow('hp', getMaxHp(t), hpColor));
+      info.appendChild(buildRow('mp', getMaxMp(t), () => 'var(--mana)'));
+
+      card.appendChild(av); card.appendChild(info);
+
+      const battleBtn = document.createElement('button');
+      battleBtn.className = 'claim-btn';
+      battleBtn.textContent = t.inBattle ? 'Savaştan Çıkar' : 'Savaşa Ekle';
+      battleBtn.onclick = (ev) => { ev.stopPropagation(); toggleCreatureBattle(t.id); };
+      card.appendChild(battleBtn);
+
+      const dup = document.createElement('button');
+      dup.className = 'claim-btn'; dup.textContent = 'Kopyala';
+      dup.onclick = (ev) => { ev.stopPropagation(); duplicateCreature(t.id); };
+      card.appendChild(dup);
+
+      const rm = document.createElement('button');
+      rm.className = 'rm-btn'; rm.textContent = '✕';
+      rm.onclick = (ev) => { ev.stopPropagation(); removeToken(t.id); };
+      card.appendChild(rm);
+
+      wrap.appendChild(card);
+    });
+  }
+
+  async function duplicateCreature(id){
+    const src = session.tokens.find(x=>x.id===id);
+    if(!src) return;
+    const baseMatch = src.name.match(/^(.*?)(?:\s(\d+))?$/);
+    const baseName = (baseMatch[1] || src.name).trim();
+    const escaped = baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const suffixRe = new RegExp('^' + escaped + '(?:\\s(\\d+))?$');
+    let maxN = 1;
+    session.tokens.filter(t => t.kind==='creature').forEach(t => {
+      const m = t.name.match(suffixRe);
+      if(m) maxN = Math.max(maxN, m[1] ? parseInt(m[1]) : 1);
+    });
+    const clone = JSON.parse(JSON.stringify(src));
+    clone.id = 't'+Date.now()+Math.floor(Math.random()*999);
+    clone.name = baseName + ' ' + (maxN+1);
+    clone.inBattle = false;
+    clone.owner = null;
+    clone.hp = getMaxHp(clone);
+    clone.mp = getMaxMp(clone);
+    session.tokens.push(clone);
+    await pushRemote();
+    renderCreatureList();
+  }
+
+  async function toggleCreatureBattle(id){
+    const t = session.tokens.find(x=>x.id===id);
+    if(!t) return;
+    if(t.inBattle){
+      t.inBattle = false;
+    } else {
+      const occupied = new Set(session.tokens.filter(x=>x.kind!=='creature'||x.inBattle).map(x=>x.row+','+x.col));
+      let placed=false;
+      for(let r=0;r<ROWS && !placed;r++){
+        for(let c=0;c<COLS && !placed;c++){
+          if(!occupied.has(r+','+c)){ t.row=r; t.col=c; placed=true; }
+        }
+      }
+      t.inBattle = true;
+      t.hp = getMaxHp(t);
+      t.mp = getMaxMp(t);
+    }
+    await pushRemote();
+    renderCreatureList();
+    renderAll();
+  }
+
+  $('btn-add-creature').onclick = () => {
+    $('cr-name').value=''; $('cr-acphys').value=5; $('cr-acmag').value=5; $('cr-maxhp').value=10; $('cr-maxmp').value=0;
+    const row = $('cr-colors'); row.innerHTML='';
+    crColor = COLORS[session.tokens.length % COLORS.length];
+    COLORS.forEach(c => {
+      const sw = document.createElement('div');
+      sw.className='color-swatch'+(c===crColor?' sel':'');
+      sw.style.background=c;
+      sw.onclick = () => { crColor=c; row.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('sel')); sw.classList.add('sel'); };
+      row.appendChild(sw);
+    });
+    $('creature-modal-backdrop').classList.add('open');
+  };
+  $('cr-cancel').onclick = () => $('creature-modal-backdrop').classList.remove('open');
+  $('cr-save').onclick = async () => {
+    const name = $('cr-name').value.trim();
+    if(!name) return;
+    const sheet = defaultSheet();
+    sheet.acPhysical = parseInt($('cr-acphys').value)||0;
+    sheet.acMagical = parseInt($('cr-acmag').value)||0;
+    sheet.fixedMaxHp = Math.max(1, parseInt($('cr-maxhp').value)||1);
+    sheet.fixedMaxMp = Math.max(0, parseInt($('cr-maxmp').value)||0);
+    const newCreature = {
+      id:'t'+Date.now()+Math.floor(Math.random()*999),
+      name, color:crColor, row:0, col:0, owner:null,
+      kind:'creature', inBattle:false,
+      sheet, hp:sheet.fixedMaxHp, mp:sheet.fixedMaxMp
+    };
+    session.tokens.push(newCreature);
+    $('creature-modal-backdrop').classList.remove('open');
+    await pushRemote();
+    renderCreatureList();
+  };
+
+  function performRoll(t, skill){
+    const roll = 1 + Math.floor(Math.random()*20);
+    const bonus = skill ? (parseInt(skill.value)||0) : 0;
+    const total = roll + bonus;
+    const entry = {
+      id: 'r'+Date.now()+Math.floor(Math.random()*999),
+      charName: t.name, skillLabel: skill ? skill.label : null,
+      roll, bonus, total, ts: Date.now()
+    };
+    session.rollLog = session.rollLog || [];
+    session.rollLog.unshift(entry);
+    session.rollLog = session.rollLog.slice(0, 15);
+    pushRemote();
+    renderRollLog();
+    showRollToast(entry);
+  }
+
+  function showRollToast(entry){
+    const toast = $('roll-toast');
+    toast.className = 'roll-toast' + (entry.roll===20?' crit20':'') + (entry.roll===1?' crit1':'');
+    $('roll-toast-big').textContent = entry.bonus ? (entry.roll+' + '+entry.bonus+' = '+entry.total) : entry.roll;
+    if(entry.combat){
+      $('roll-toast-sub').textContent = entry.charName+' → '+entry.targetName+' · '+(entry.hit ? ('İSABET, '+entry.dmg+' hasar') : 'ISKALADI');
+    } else {
+      $('roll-toast-sub').textContent = entry.charName + (entry.skillLabel ? (' · '+entry.skillLabel) : ' · Düz D20');
+    }
+    requestAnimationFrame(() => toast.classList.add('show'));
+    clearTimeout(showRollToast._t);
+    showRollToast._t = setTimeout(() => toast.classList.remove('show'), 2400);
+  }
+
+  // ---------- Combat resolution ----------
+  async function resolveMeleeAttack(actor, target){
+    if(!actor || !target) return;
+    const range = actor.sheet.meleeRange || 1;
+    const skillLabel = range<=1 ? 'YAKIN DÖVÜŞ' : 'ATICILIK';
+    const skillVal = findSkillValue(actor, skillLabel);
+    const roll = 1 + Math.floor(Math.random()*20);
+    const total = roll + skillVal;
+    const ac = target.sheet.acPhysical != null ? target.sheet.acPhysical : 5;
+    const hit = total >= ac;
+    const dmg = hit ? Math.max(0, 1 + (actor.sheet.meleeDamageBonus||0)) : 0;
+    if(hit) target.hp = Math.max(0, target.hp - dmg);
+
+    const entry = {
+      id:'r'+Date.now()+Math.floor(Math.random()*999), combat:true,
+      charName:actor.name, targetName:target.name, skillLabel, roll, bonus:skillVal, total,
+      ac, hit, dmg, atkType:'fiziksel', ts:Date.now()
+    };
+    logRoll(entry);
+    actionMode = null; actingTokenId = null; pendingAbility = null;
+    await pushRemote();
+    renderAll();
+    checkDeath(target);
+  }
+
+  async function resolveAbility(actor, target, ability){
+    if(!actor || !target || !ability) return;
+    if((actor.mp||0) < (ability.manaCost||0)){ alert('Yetersiz mana!'); actionMode=null; actingTokenId=null; pendingAbility=null; renderGrid(); return; }
+    actor.mp = Math.max(0, actor.mp - (ability.manaCost||0));
+    const skillVal = findSkillValue(actor, ability.skillLabel||'');
+    const roll = 1 + Math.floor(Math.random()*20);
+    const total = roll + skillVal;
+    const isMagic = ability.dmgType === 'buyusel';
+    const ac = isMagic ? (target.sheet.acMagical!=null?target.sheet.acMagical:5) : (target.sheet.acPhysical!=null?target.sheet.acPhysical:5);
+    const hit = total >= ac;
+    const dmg = hit ? Math.max(0, parseInt(ability.damage)||0) : 0;
+    if(hit) target.hp = Math.max(0, target.hp - dmg);
+
+    const entry = {
+      id:'r'+Date.now()+Math.floor(Math.random()*999), combat:true,
+      charName:actor.name, targetName:target.name, skillLabel: ability.skillLabel || ability.name,
+      roll, bonus:skillVal, total, ac, hit, dmg, atkType: ability.dmgType, abilityName: ability.name, ts:Date.now()
+    };
+    logRoll(entry);
+    actionMode = null; actingTokenId = null; pendingAbility = null;
+    await pushRemote();
+    renderAll();
+    checkDeath(target);
+  }
+
+  async function resolveItemUse(actor, item){
+    actor.inventory = (actor.inventory||[]).filter(i => i.id !== item.id);
+    const entry = {
+      id:'r'+Date.now()+Math.floor(Math.random()*999),
+      charName:actor.name, skillLabel:null, roll:0, bonus:0, total:0, ts:Date.now(),
+      itemUse:true, itemName:item.name
+    };
+    session.rollLog = session.rollLog || [];
+    session.rollLog.unshift(entry);
+    session.rollLog = session.rollLog.slice(0, 15);
+    actingTokenId = null;
+    await pushRemote();
+    renderAll();
+  }
+
+  function logRoll(entry){
+    session.rollLog = session.rollLog || [];
+    session.rollLog.unshift(entry);
+    session.rollLog = session.rollLog.slice(0, 15);
+    renderRollLog();
+    showRollToast(entry);
+  }
+
+  function updateCalcDisplay(t){
+    $('calc-maxhp').textContent = getMaxHp(t);
+    $('calc-maxmp').textContent = getMaxMp(t);
+    $('calc-speed').textContent = getSpeed(t);
+  }
+
+  function recalcAndSave(t){
+    clampCurrentStats(t);
+    updateCalcDisplay(t);
+    pushRemote();
+  }
+
+  $('sheet-name').onchange = () => {
+    const t = getSheetToken(); if(!t) return;
+    t.name = $('sheet-name').value.trim() || t.name;
+    $('sheet-name').value = t.name;
+    pushRemote();
+  };
+  $('sheet-class').onchange = () => {
+    const t = getSheetToken(); if(!t) return;
+    t.sheet.className = $('sheet-class').value;
+    pushRemote();
+  };
+  $('sheet-level').onchange = () => {
+    const t = getSheetToken(); if(!t) return;
+    t.sheet.level = Math.max(1, parseInt($('sheet-level').value)||1);
+    $('sheet-level').value = t.sheet.level;
+    recalcAndSave(t);
+  };
+  $('sheet-hpbonus').onchange = () => {
+    const t = getSheetToken(); if(!t) return;
+    t.sheet.hpBonus = parseInt($('sheet-hpbonus').value)||0;
+    $('sheet-hpbonus').value = t.sheet.hpBonus;
+    recalcAndSave(t);
+  };
+  $('sheet-manabonus').onchange = () => {
+    const t = getSheetToken(); if(!t) return;
+    t.sheet.manaBonus = parseInt($('sheet-manabonus').value)||0;
+    $('sheet-manabonus').value = t.sheet.manaBonus;
+    recalcAndSave(t);
+  };
+  $('sheet-meleerange').onchange = () => {
+    const t = getSheetToken(); if(!t) return;
+    t.sheet.meleeRange = Math.max(1, parseInt($('sheet-meleerange').value)||1);
+    $('sheet-meleerange').value = t.sheet.meleeRange;
+    pushRemote();
+  };
+  $('sheet-meleedmg').onchange = () => {
+    const t = getSheetToken(); if(!t) return;
+    t.sheet.meleeDamageBonus = parseInt($('sheet-meleedmg').value)||0;
+    $('sheet-meleedmg').value = t.sheet.meleeDamageBonus;
+    pushRemote();
+  };
+  $('sheet-acphys').onchange = () => {
+    const t = getSheetToken(); if(!t) return;
+    t.sheet.acPhysical = parseInt($('sheet-acphys').value)||0;
+    $('sheet-acphys').value = t.sheet.acPhysical;
+    pushRemote();
+  };
+  $('sheet-acmag').onchange = () => {
+    const t = getSheetToken(); if(!t) return;
+    t.sheet.acMagical = parseInt($('sheet-acmag').value)||0;
+    $('sheet-acmag').value = t.sheet.acMagical;
+    pushRemote();
+  };
+  $('sheet-fixedhp').onchange = () => {
+    const t = getSheetToken(); if(!t) return;
+    t.sheet.fixedMaxHp = Math.max(1, parseInt($('sheet-fixedhp').value)||1);
+    $('sheet-fixedhp').value = t.sheet.fixedMaxHp;
+    recalcAndSave(t);
+  };
+  $('sheet-fixedmp').onchange = () => {
+    const t = getSheetToken(); if(!t) return;
+    t.sheet.fixedMaxMp = Math.max(0, parseInt($('sheet-fixedmp').value)||0);
+    $('sheet-fixedmp').value = t.sheet.fixedMaxMp;
+    recalcAndSave(t);
+  };
+  $('btn-add-skill').onclick = () => {
+    const t = getSheetToken(); if(!t) return;
+    t.sheet.skills.push({label:'', category:'', value:0});
+    renderSheet(t);
+    pushRemote();
+  };
+
+  // ---------- Abilities editor ----------
+  function renderAbilitiesList(t, editable){
+    const wrap = $('abilities-list');
+    wrap.innerHTML = '';
+    const skillOptions = t.sheet.skills.filter(s => (s.label||'').trim());
+    (t.sheet.abilities||[]).forEach((ab, i) => {
+      const card = document.createElement('div');
+      card.className = 'ability-card';
+
+      const nameInp = document.createElement('input');
+      nameInp.className = 'ability-name'; nameInp.value = ab.name || ''; nameInp.placeholder = 'Yetenek adı';
+      nameInp.disabled = !editable;
+      nameInp.onchange = () => { ab.name = nameInp.value; pushRemote(); };
+      card.appendChild(nameInp);
+
+      const descInp = document.createElement('textarea');
+      descInp.className = 'ability-desc'; descInp.value = ab.desc || ''; descInp.placeholder = 'Açıklama';
+      descInp.disabled = !editable;
+      descInp.onchange = () => { ab.desc = descInp.value; pushRemote(); };
+      card.appendChild(descInp);
+
+      const grid = document.createElement('div'); grid.className = 'ability-grid';
+      const manaWrap = document.createElement('div');
+      manaWrap.innerHTML = '<label>Mana Bedeli</label>';
+      const manaInp = document.createElement('input'); manaInp.type='number'; manaInp.value = ab.manaCost||0; manaInp.disabled=!editable;
+      manaInp.onchange = () => { ab.manaCost = parseInt(manaInp.value)||0; pushRemote(); };
+      manaWrap.appendChild(manaInp);
+
+      const rangeWrap = document.createElement('div');
+      rangeWrap.innerHTML = '<label>Menzil</label>';
+      const rangeInp = document.createElement('input'); rangeInp.type='number'; rangeInp.min=1; rangeInp.value = ab.range||1; rangeInp.disabled=!editable;
+      rangeInp.onchange = () => { ab.range = Math.max(1, parseInt(rangeInp.value)||1); pushRemote(); };
+      rangeWrap.appendChild(rangeInp);
+
+      const dmgWrap = document.createElement('div');
+      dmgWrap.innerHTML = '<label>Hasar</label>';
+      const dmgInp = document.createElement('input'); dmgInp.type='number'; dmgInp.value = ab.damage||0; dmgInp.disabled=!editable;
+      dmgInp.onchange = () => { ab.damage = parseInt(dmgInp.value)||0; pushRemote(); };
+      dmgWrap.appendChild(dmgInp);
+
+      grid.appendChild(manaWrap); grid.appendChild(rangeWrap); grid.appendChild(dmgWrap);
+      card.appendChild(grid);
+
+      const row2 = document.createElement('div'); row2.className = 'ability-row2';
+      const typeSel = document.createElement('select'); typeSel.disabled = !editable;
+      ['fiziksel','buyusel'].forEach(v => {
+        const o = document.createElement('option'); o.value=v; o.textContent = v==='fiziksel' ? 'Fiziksel' : 'Büyüsel';
+        if((ab.dmgType||'fiziksel')===v) o.selected = true;
+        typeSel.appendChild(o);
+      });
+      typeSel.onchange = () => { ab.dmgType = typeSel.value; pushRemote(); };
+
+      const skillSel = document.createElement('select'); skillSel.disabled = !editable;
+      const noneOpt = document.createElement('option'); noneOpt.value=''; noneOpt.textContent='Özellik seç';
+      skillSel.appendChild(noneOpt);
+      skillOptions.forEach(s => {
+        const o = document.createElement('option'); o.value = s.label; o.textContent = s.label;
+        if((ab.skillLabel||'').toUpperCase() === s.label.toUpperCase()) o.selected = true;
+        skillSel.appendChild(o);
+      });
+      skillSel.onchange = () => { ab.skillLabel = skillSel.value; pushRemote(); };
+
+      row2.appendChild(typeSel); row2.appendChild(skillSel);
+      card.appendChild(row2);
+
+      if(editable){
+        const rm = document.createElement('button');
+        rm.className = 'ability-remove'; rm.textContent = '✕ Yeteneği Sil';
+        rm.onclick = () => { t.sheet.abilities.splice(i,1); renderAbilitiesList(t, editable); pushRemote(); };
+        card.appendChild(rm);
+      }
+      wrap.appendChild(card);
+    });
+    $('btn-add-ability').style.display = editable ? 'block' : 'none';
+  }
+  $('btn-add-ability').onclick = () => {
+    const t = getSheetToken(); if(!t) return;
+    t.sheet.abilities.push({
+      id:'ab'+Date.now()+Math.floor(Math.random()*999),
+      name:'', desc:'', manaCost:1, range:1, damage:1, dmgType:'fiziksel', skillLabel:''
+    });
+    renderAbilitiesList(t, true);
+    pushRemote();
+  };
+
+  $('portrait-wrap').onclick = () => {
+    const t = getSheetToken();
+    if(!t || !canControl(t)) return;
+    $('portrait-input').click();
+  };
+  $('portrait-input').onchange = (ev) => {
+    const file = ev.target.files[0];
+    if(!file) return;
+    const t = getSheetToken();
+    if(!t) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 200;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const scale = Math.max(size/img.width, size/img.height);
+        const w = img.width*scale, h = img.height*scale;
+        ctx.drawImage(img, (size-w)/2, (size-h)/2, w, h);
+        t.sheet.portrait = canvas.toDataURL('image/jpeg', 0.75);
+        renderSheet(t);
+        pushRemote();
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+    ev.target.value = '';
+  };
+
+})();
+</script>
+</body>
+</html>
