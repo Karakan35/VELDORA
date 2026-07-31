@@ -194,6 +194,7 @@
   .modal{
     width:100%; max-width:560px; background:var(--ink-2); border-top:1px solid var(--line);
     border-radius:16px 16px 0 0; padding:20px; display:flex; flex-direction:column; gap:12px;
+    max-height:78vh; overflow-y:auto;
   }
   .modal h3{ color:var(--gold-bright); font-size:16px; }
   .color-row{ display:flex; gap:8px; flex-wrap:wrap; }
@@ -237,7 +238,7 @@
   .stat-box div{ font-family:'Cinzel',serif; font-size:18px; color:var(--gold-bright); font-weight:700; }
   .calc-hint{ font-size:10.5px; color:var(--text-dim); line-height:1.5; margin:8px 0 20px; }
   .effective-hint{ color:var(--gold-bright); font-weight:700; text-transform:none; letter-spacing:0; font-size:11px; }
-  .skill-bonus{ font-size:11px; color:var(--gold-bright); font-weight:700; margin-left:6px; white-space:nowrap; align-self:center; }
+  .skill-bonus{ display:block; font-size:11px; color:var(--gold-bright); font-weight:700; margin:0 0 9px 2px; }
   .dice-btn{
     width:100%; padding:14px; border-radius:8px; margin-bottom:10px;
     background:linear-gradient(180deg,var(--gold-bright),var(--gold)); color:#241a08; font-weight:700; font-size:15px;
@@ -271,7 +272,7 @@
   .roll-toast.crit20 .big{ color:var(--ok); text-shadow:0 0 20px rgba(111,143,90,.6); }
   .roll-toast.crit1 .big{ color:var(--ember-bright); text-shadow:0 0 20px rgba(226,99,42,.6); }
   .roll-toast .sub{ font-size:12px; color:var(--text-dim); margin-top:4px; }
-  .skill-row{ display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+  .skill-row{ display:flex; align-items:center; gap:8px; margin-bottom:3px; }
   .skill-label{
     flex:1; padding:9px 10px; background:var(--ink-2); border:1px solid var(--line); border-radius:6px;
     color:var(--text); font-size:13px; min-width:0;
@@ -713,7 +714,7 @@
                   {key:'acType', label:'Tür', type:'select', options:['Fiziksel','Büyüsel']},
                   {key:'amount', label:'Miktar', type:'number'} ] },
     statBonus:{ label:'Özellik Bonusu', params:[
-                  {key:'stat', label:'Özellik', type:'text', placeholder:'ör. Akademi'},
+                  {key:'stat', label:'Özellik', type:'select', options: DEFAULT_SKILLS.map(d=>d[0])},
                   {key:'amount', label:'Miktar', type:'number'} ] },
     maxHpBoost:{ label:'Maksimum Can Artışı', params:[
                   {key:'amount', label:'Miktar', type:'number'} ] },
@@ -786,8 +787,8 @@
   }
   function resolveAmountValue(raw, baseForPercent){
     const s = String(raw==null?'':raw).trim();
-    if(s.endsWith('%')){
-      const pct = parseFloat(s)||0;
+    if(s.startsWith('%') || s.endsWith('%')){
+      const pct = parseFloat(s.replace('%',''))||0;
       return Math.round((baseForPercent||0) * pct/100);
     }
     return rollDiceExpr(s);
@@ -1720,6 +1721,7 @@
     const list = $('skills-list');
     list.innerHTML = '';
     t.sheet.skills.forEach((s, i) => {
+      const wrap = document.createElement('div');
       const row = document.createElement('div');
       row.className = 'skill-row';
 
@@ -1741,18 +1743,20 @@
       val.onchange = () => { s.value = parseInt(val.value)||0; val.value = s.value; recalcAndSave(t); renderSheet(t); };
 
       row.appendChild(label); row.appendChild(cat); row.appendChild(val);
+      wrap.appendChild(row);
 
       if((s.label||'').trim()){
         const effective = findSkillValue(t, s.label.trim().toUpperCase());
         const base = parseInt(s.value)||0;
-        if(effective !== base){
-          const bonus = document.createElement('span');
+        const diff = effective - base;
+        if(diff !== 0){
+          const bonus = document.createElement('div');
           bonus.className = 'skill-bonus';
-          bonus.textContent = '→ ' + effective;
-          row.appendChild(bonus);
+          bonus.textContent = 'Temel ' + base + ' ' + (diff>0?'+':'') + diff + ' = ' + effective;
+          wrap.appendChild(bonus);
         }
       }
-      list.appendChild(row);
+      list.appendChild(wrap);
     });
     $('btn-add-skill').style.display = editable ? 'block' : 'none';
   }
@@ -1796,10 +1800,12 @@
 
   function openSkillRollPicker(t){
     const skills = (t.sheet ? t.sheet.skills : []).filter(s => (s.label||'').trim());
-    const opts = skills.map(s => ({
-      label: esc(s.label) + ' <span class="n">+'+(parseInt(s.value)||0)+'</span>',
-      value: s
-    }));
+    const opts = skills.map(s => {
+      const eff = findSkillValue(t, s.label.trim().toUpperCase());
+      const base = parseInt(s.value)||0;
+      const tag = eff!==base ? ('+'+eff+' (temel '+base+')') : ('+'+eff);
+      return { label: esc(s.label) + ' <span class="n">'+tag+'</span>', value: s };
+    });
     openPicker('Özellik Seç', opts, (skill) => { performRoll(t, skill); }, 'Bu karakterin tanımlı bir özelliği yok.');
   }
 
@@ -2348,7 +2354,7 @@
 
   function performRoll(t, skill){
     const roll = 1 + Math.floor(Math.random()*20);
-    const bonus = skill ? (parseInt(skill.value)||0) : 0;
+    const bonus = skill ? findSkillValue(t, skill.label.trim().toUpperCase()) : 0;
     const total = roll + bonus;
     const entry = {
       id: 'r'+Date.now()+Math.floor(Math.random()*999),
