@@ -316,6 +316,8 @@
   #inv-tab.active{ display:block; }
   #creatures-tab{ padding:14px; display:none; }
   #creatures-tab.active{ display:block; }
+  #items-tab{ padding:14px; display:none; }
+  #items-tab.active{ display:block; }
   .item-card{
     display:flex; align-items:center; gap:10px; background:var(--ink-2); border:1px solid var(--line);
     border-radius:8px; padding:10px 12px; margin-bottom:8px;
@@ -336,6 +338,32 @@
   .equip-slot.filled{ border-color:var(--gold); }
   .equip-slot.filled .slot-value{ color:var(--gold-bright); }
   .equip-slot .slot-value.empty{ color:var(--text-dim); font-weight:400; font-style:italic; }
+
+  /* ---------- Item templates ---------- */
+  .quality-row{ display:flex; gap:8px; flex-wrap:wrap; }
+  .quality-swatch{
+    display:flex; align-items:center; gap:6px; padding:7px 12px; border-radius:20px;
+    background:var(--ink-2); border:1px solid var(--line); font-size:11px; color:var(--text-dim); font-weight:600;
+  }
+  .quality-swatch .dot{ width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .quality-swatch.sel{ border-color:currentColor; }
+  .effect-slot-card{
+    background:var(--ink-2); border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:10px;
+  }
+  .effect-slot-card .es-title{ font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px; }
+  .effect-slot-card select, .effect-slot-card input{
+    width:100%; padding:9px 10px; background:var(--ink-3); border:1px solid var(--line); border-radius:6px;
+    color:var(--text); font-size:13px; margin-bottom:8px;
+  }
+  .effect-param-label{ font-size:10px; color:var(--text-dim); margin-bottom:3px; display:block; }
+  .item-tpl-card{
+    display:flex; align-items:center; gap:10px; background:var(--ink-2); border:1px solid var(--line); border-left:4px solid var(--line);
+    border-radius:8px; padding:10px 12px; margin-bottom:8px; cursor:pointer;
+  }
+  .item-tpl-card .tpl-info{ flex:1; min-width:0; }
+  .item-tpl-card .tpl-name{ font-size:13px; font-weight:600; }
+  .item-tpl-card .tpl-meta{ font-size:10.5px; color:var(--text-dim); margin-top:2px; }
+  .item-quality-badge{ font-size:10px; padding:2px 7px; border-radius:8px; font-weight:700; }
 </style>
 </head>
 <body>
@@ -406,6 +434,8 @@
           <div class="dice-char-row" id="dice-char-row"></div>
           <div id="dice-roll-area"></div>
         </div>
+
+        <button class="primary-btn" id="btn-end-turn" style="width:100%; margin-top:16px; display:none;">Turu Bitir</button>
       </div>
 
       <div id="chars-tab">
@@ -419,11 +449,17 @@
         <h3 class="sheet-section-title" id="inv-list-header" style="margin-top:18px;">EŞYALAR</h3>
         <div id="inv-list"></div>
         <button class="add-char-btn" id="btn-add-item" style="display:none;">+ Eşya Ekle</button>
+        <button class="add-char-btn" id="btn-add-from-library" style="display:none;">📦 Kütüphaneden Ekle</button>
       </div>
 
       <div id="creatures-tab">
         <div id="creature-list"></div>
         <button class="add-char-btn" id="btn-add-creature">+ Yaratık Ekle</button>
+      </div>
+
+      <div id="items-tab">
+        <div id="item-template-list"></div>
+        <button class="add-char-btn" id="btn-add-item-template">+ Yeni Eşya</button>
       </div>
     </div>
 
@@ -432,6 +468,7 @@
       <button id="tab-btn-chars"><span class="ic">🛡</span>Karakterler</button>
       <button id="tab-btn-inv"><span class="ic">🎒</span>Envanter</button>
       <button id="tab-btn-creatures" style="display:none;"><span class="ic">🐉</span>Yaratıklar</button>
+      <button id="tab-btn-items" style="display:none;"><span class="ic">💎</span>Eşyalar</button>
     </div>
   </div>
 
@@ -578,6 +615,29 @@
   </div>
 </div>
 
+<!-- ITEM TEMPLATE EDITOR -->
+<div class="sheet-overlay" id="item-editor-screen">
+  <div class="sheet-header">
+    <button id="ie-back">‹ Geri</button>
+    <div class="sheet-header-title">EŞYA</div>
+    <button id="ie-delete" style="color:var(--ember-bright);">Sil</button>
+  </div>
+  <div class="sheet-body">
+    <div class="field"><label>İsim</label><input id="ie-name" type="text" maxlength="30"></div>
+    <div class="field">
+      <label>Tür</label>
+      <select id="ie-type"></select>
+    </div>
+    <div class="field">
+      <label>Kalite</label>
+      <div class="quality-row" id="ie-quality-row"></div>
+    </div>
+
+    <h3 class="sheet-section-title" style="margin-top:20px;">EFEKTLER</h3>
+    <div id="ie-effects"></div>
+  </div>
+</div>
+
 <div class="roll-toast" id="roll-toast">
   <div class="big" id="roll-toast-big">-</div>
   <div class="sub" id="roll-toast-sub"></div>
@@ -611,6 +671,68 @@
     ['DOĞA / HAYVAN','BLG'], ['ATICILIK','FZK'], ['EL ÇABUKLUĞU','HNR'],
     ['İKNA / MUHABBET','HNR'], ['YALAN / ALDATMA','HNR'], ['İLİM','BLG'], ['HİS','HNR']
   ];
+
+  const ITEM_TYPES = ['Kullanılabilir','Giyilebilir','Malzeme','Ivır Zıvır','Diğer'];
+  const QUALITIES = [
+    {key:'beyaz',    label:'Değersiz',  color:'#c9c2b8'},
+    {key:'yesil',    label:'Yaygın',    color:'#6f8f5a'},
+    {key:'mavi',     label:'Nadir',     color:'#5a7fa6'},
+    {key:'pembe',    label:'Epik',      color:'#c76fb0'},
+    {key:'turuncu',  label:'Efsanevi',  color:'#e2632a'},
+    {key:'kirmizi',  label:'Kadim',     color:'#c1440e'}
+  ];
+  const EFFECT_DEFS = {
+    none:     { label:'Yok', params:[] },
+    heal:     { label:'İyileştirme (Heal)', params:[
+                  {key:'amount', label:'Miktar', type:'text', placeholder:'ör. 10 ya da 2d6'} ] },
+    dot:      { label:'Zamana Yayılı Hasar (D.O.T)', params:[
+                  {key:'duration', label:'Süre (Tur)', type:'number'},
+                  {key:'damage', label:'Tur Başı Hasar', type:'text', placeholder:'ör. 1d4'},
+                  {key:'damageType', label:'Hasar Tipi', type:'select', options:['Zehir','Yanık','Kanama','Diğer']} ] },
+    hot:      { label:'Zamana Yayılı İyileştirme (H.O.T)', params:[
+                  {key:'duration', label:'Süre (Tur)', type:'number'},
+                  {key:'heal', label:'Tur Başı İyileştirme', type:'text', placeholder:'ör. 1d4'} ] },
+    acBoost:  { label:'AC Artışı', params:[
+                  {key:'acType', label:'Tür', type:'select', options:['Fiziksel','Büyüsel']},
+                  {key:'amount', label:'Miktar', type:'number'} ] },
+    statBonus:{ label:'Özellik Bonusu', params:[
+                  {key:'stat', label:'Özellik', type:'text', placeholder:'ör. Akademi'},
+                  {key:'amount', label:'Miktar', type:'number'} ] },
+    maxHpBoost:{ label:'Maksimum Can Artışı', params:[
+                  {key:'amount', label:'Miktar', type:'number'} ] },
+    dmgBoost: { label:'Hasar Artışı', params:[
+                  {key:'dmgType', label:'Tür', type:'select', options:['Fiziksel','Büyüsel']},
+                  {key:'amount', label:'Miktar', type:'number'} ] },
+    buffDebuff:{ label:'Güçlendirme / Zayıflatma (Buff/Debuff)', params:[
+                  {key:'target', label:'Hedef (AC, Hasar, Özellik…)', type:'text'},
+                  {key:'amount', label:'Miktar (+/-)', type:'number'},
+                  {key:'duration', label:'Süre', type:'text', placeholder:'ör. 3 tur / Savaş Boyunca'} ] },
+    stun:     { label:'Sersemletme (Stun / Freeze / Sleep / Shocked)', params:[
+                  {key:'statusName', label:'Durum', type:'select', options:['Stun','Freeze','Sleep','Shocked']},
+                  {key:'duration', label:'Süre (Tur)', type:'number'} ] },
+    resistance:{ label:'Direnç (Resistance)', params:[
+                  {key:'statusName', label:'Hangi Duruma', type:'text', placeholder:'ör. Stun'} ] },
+    silence:  { label:'Susturma (Silence)', params:[
+                  {key:'duration', label:'Süre (Tur)', type:'number'} ] },
+    lifesteal:{ label:'Can Çalma (Lifesteal)', params:[
+                  {key:'percent', label:'Oran (%)', type:'number'} ] },
+    thorns:   { label:'Diken / Yansıtma (Thorns / Reflect)', params:[
+                  {key:'amount', label:'Miktar / Oran', type:'text'} ] },
+    secondChance:{ label:'Kritik Kurtarma (Second Chance / Revive)', params:[
+                  {key:'revivePercent', label:'Yeniden Doğma Canı (%)', type:'number'} ] },
+    execute:  { label:'İnfaz (Execute)', params:[
+                  {key:'threshold', label:'Can Eşiği (% Altı)', type:'number'},
+                  {key:'extraDamage', label:'Ekstra Hasar', type:'text'} ] },
+    cleanse:  { label:'Arındırma (Cleanse)', params:[
+                  {key:'effectType', label:'Temizlenecek Efekt', type:'text', placeholder:'ör. Hepsi / Zehir'} ] },
+    movementBoost:{ label:'Hareket Artışı (Movement Boost)', params:[
+                  {key:'amount', label:'Miktar', type:'number'} ] }
+  };
+  function blankEffect(){ return {type:'none', params:{}}; }
+  function blankItemTemplate(){
+    return { id:'it'+Date.now()+Math.floor(Math.random()*999), name:'Yeni Eşya', type:'Diğer', quality:'beyaz',
+      effects:[blankEffect(), blankEffect(), blankEffect()] };
+  }
   function defaultSheet(){
     const skills = DEFAULT_SKILLS.map(([label,cat]) => ({label, category:cat, value:0}));
     skills.push({label:'', category:'', value:0});
@@ -676,7 +798,7 @@
     if(typeof firebase === 'undefined' || !fbDb){ setupError('Veritabanına bağlanılamadı — internet bağlantını kontrol et.'); return; }
     const code = genCode();
     me.name = name; me.code = code; me.role = 'dm'; // oda kuran kişi Zindan Ustası olur
-    const fresh = { code, tokens:[], activeTokenId:null, rollLog:[], updatedAt: Date.now() };
+    const fresh = { code, tokens:[], activeTokenId:null, turnOrder:[], rollLog:[], itemTemplates:[], updatedAt: Date.now() };
     try{
       await fbDb.ref('sessions/'+code).set(fresh);
       session = fresh;
@@ -716,6 +838,7 @@
     $('btn-export').style.display = me.role === 'dm' ? 'inline-block' : 'none';
     $('btn-import').style.display = me.role === 'dm' ? 'inline-block' : 'none';
     $('tab-btn-creatures').style.display = me.role === 'dm' ? 'flex' : 'none';
+    $('tab-btn-items').style.display = me.role === 'dm' ? 'flex' : 'none';
 
     $('grid').style.width = (COLS*CELL)+'px';
     $('grid').style.height = (ROWS*CELL)+'px';
@@ -769,18 +892,22 @@
   $('tab-btn-chars').onclick = () => switchTab('chars');
   $('tab-btn-inv').onclick = () => switchTab('inv');
   $('tab-btn-creatures').onclick = () => switchTab('creatures');
+  $('tab-btn-items').onclick = () => switchTab('items');
   function switchTab(t){
     $('map-tab').classList.toggle('active', t==='map');
     $('chars-tab').classList.toggle('active', t==='chars');
     $('inv-tab').classList.toggle('active', t==='inv');
     $('creatures-tab').classList.toggle('active', t==='creatures');
+    $('items-tab').classList.toggle('active', t==='items');
     $('tab-btn-map').classList.toggle('active', t==='map');
     $('tab-btn-chars').classList.toggle('active', t==='chars');
     $('tab-btn-inv').classList.toggle('active', t==='inv');
     $('tab-btn-creatures').classList.toggle('active', t==='creatures');
+    $('tab-btn-items').classList.toggle('active', t==='items');
     if(t==='map') renderDicePanel();
     if(t==='inv') renderInventoryTab();
     if(t==='creatures') renderCreatureList();
+    if(t==='items') renderItemTemplateList();
   }
 
   function applyAvatar(el, t){
@@ -853,14 +980,25 @@
   function renderAll(){
     session.tokens.forEach(ensureTokenDefaults);
     if(!session.rollLog) session.rollLog = [];
+    if(!session.turnOrder) session.turnOrder = [];
+    if(!session.itemTemplates) session.itemTemplates = [];
     renderTurnBanner();
     renderGrid();
     renderCharList();
     renderRollLog();
     renderDicePanel();
+    updateEndTurnButton();
     if($('inv-tab').classList.contains('active')) renderInventoryTab();
     if($('creatures-tab').classList.contains('active')) renderCreatureList();
+    if($('items-tab').classList.contains('active')) renderItemTemplateList();
   }
+
+  function updateEndTurnButton(){
+    const active = session.tokens.find(t=>t.id===session.activeTokenId);
+    const canEnd = active && (me.role==='dm' || active.owner===me.name);
+    $('btn-end-turn').style.display = canEnd ? 'block' : 'none';
+  }
+  $('btn-end-turn').onclick = endTurn;
 
   function renderRollLog(){
     const wrap = $('roll-log');
@@ -882,28 +1020,51 @@
     });
   }
 
+  function computeInitiative(t){
+    const level = (t.sheet && t.sheet.level) || 1;
+    const cevik = findSkillValue(t, 'ÇEVİKLİK');
+    return level + cevik;
+  }
+
   function renderTurnBanner(){
+    const order = (session.turnOrder||[]).map(id => session.tokens.find(t=>t.id===id)).filter(Boolean);
     const active = session.tokens.find(t => t.id === session.activeTokenId);
-    if(active){
-      $('turn-banner').innerHTML = 'Sıra: <b>'+esc(active.name)+'</b>' + (me.role==='dm' ? ' — <span style="text-decoration:underline;cursor:pointer" id="end-turn-link">sırayı geç</span>' : '');
-      const link = document.getElementById('end-turn-link');
-      if(link) link.onclick = endTurn;
+    let html = '';
+    if(active && order.length){
+      const idx = order.findIndex(t=>t.id===active.id);
+      const upNext = order.slice(idx+1).concat(order.slice(0,idx)).slice(0,3).map(t=>esc(t.name)).join(' → ');
+      html = 'Sıra: <b>'+esc(active.name)+'</b>' + (upNext ? ' <span style="opacity:.7">(sonra: '+upNext+')</span>' : '');
     } else {
-      $('turn-banner').innerHTML = me.role==='dm'
-        ? 'Savaş başlamadı — <span style="text-decoration:underline;cursor:pointer" id="end-turn-link">sırayı başlat</span>'
-        : 'Zindan Ustası sırayı henüz başlatmadı.';
-      const link = document.getElementById('end-turn-link');
-      if(link) link.onclick = endTurn;
+      html = 'Savaş sırası henüz belirlenmedi.';
     }
+    if(me.role==='dm'){
+      html += ' — <span style="text-decoration:underline;cursor:pointer" id="reset-turn-link">Turu Sıfırla</span>';
+    }
+    $('turn-banner').innerHTML = html;
+    const link = document.getElementById('reset-turn-link');
+    if(link) link.onclick = resetTurnOrder;
+  }
+
+  async function resetTurnOrder(){
+    if(me.role !== 'dm') return;
+    const participants = session.tokens.filter(t => t.kind!=='creature' || t.inBattle);
+    const sorted = participants.slice().sort((a,b) => computeInitiative(b) - computeInitiative(a));
+    session.turnOrder = sorted.map(t=>t.id);
+    session.activeTokenId = session.turnOrder[0] || null;
+    await pushRemote();
+    renderAll();
   }
 
   async function endTurn(){
-    if(me.role !== 'dm') return;
-    const active = session.tokens.filter(t => t.kind!=='creature' || t.inBattle);
-    if(active.length === 0) return;
-    const ids = active.map(t=>t.id);
-    const curIdx = ids.indexOf(session.activeTokenId);
-    session.activeTokenId = ids[(curIdx+1) % ids.length];
+    const activeIds = (session.turnOrder||[]).filter(id => {
+      const t = session.tokens.find(x=>x.id===id);
+      return t && (t.kind!=='creature' || t.inBattle);
+    });
+    if(activeIds.length === 0) return;
+    const active = session.tokens.find(t=>t.id===session.activeTokenId);
+    if(!(me.role==='dm' || (active && active.owner===me.name))) return;
+    const curIdx = activeIds.indexOf(session.activeTokenId);
+    session.activeTokenId = activeIds[(curIdx+1) % activeIds.length];
     await pushRemote();
     renderAll();
   }
@@ -1502,6 +1663,7 @@
     const list = $('inv-list');
     list.innerHTML = '';
     $('btn-add-item').style.display = sel ? 'block' : 'none';
+    $('btn-add-from-library').style.display = (sel && me.role==='dm') ? 'block' : 'none';
     if(!sel){
       const p = document.createElement('p');
       p.className='map-hint'; p.style.marginTop='0';
@@ -1518,8 +1680,20 @@
     (sel.inventory||[]).forEach(item => {
       const card = document.createElement('div');
       card.className = 'item-card';
+      if(item.quality){
+        const q = qualityOf(item.quality);
+        card.style.borderLeft = '4px solid '+q.color;
+      }
+      const info = document.createElement('div'); info.style.flex='1'; info.style.minWidth='0';
       const nm = document.createElement('div'); nm.className='item-name'; nm.textContent = item.name;
-      card.appendChild(nm);
+      info.appendChild(nm);
+      const effectNames = (item.effects||[]).filter(e=>e && e.type!=='none').map(e=>EFFECT_DEFS[e.type]?EFFECT_DEFS[e.type].label:e.type);
+      if(effectNames.length){
+        const eff = document.createElement('div'); eff.style.fontSize='10.5px'; eff.style.color='var(--text-dim)'; eff.style.marginTop='2px';
+        eff.textContent = effectNames.join(', ');
+        info.appendChild(eff);
+      }
+      card.appendChild(info);
       if((item.tag||'').trim()){
         const tag = document.createElement('span'); tag.className='item-tag'; tag.textContent = item.tag;
         card.appendChild(tag);
@@ -1583,6 +1757,26 @@
     $('item-modal-backdrop').classList.remove('open');
     await pushRemote();
     renderInventoryTab();
+  };
+
+  $('btn-add-from-library').onclick = () => {
+    const t = session.tokens.find(x=>x.id===invCharId);
+    if(!t) return;
+    const templates = session.itemTemplates || [];
+    const opts = templates.map(tpl => {
+      const q = qualityOf(tpl.quality);
+      return { label: '<span style="color:'+q.color+'">●</span> ' + esc(tpl.name) + ' <span class="n">('+esc(tpl.type)+')</span>', value: tpl };
+    });
+    openPicker('Kütüphaneden Eşya Seç', opts, (tpl) => {
+      t.inventory = t.inventory || [];
+      t.inventory.push({
+        id:'i'+Date.now()+Math.floor(Math.random()*999),
+        name: tpl.name, tag: tpl.type, quality: tpl.quality,
+        effects: JSON.parse(JSON.stringify(tpl.effects||[]))
+      });
+      pushRemote();
+      renderInventoryTab();
+    }, 'Kütüphanede henüz eşya yok — önce Eşyalar sekmesinden ekle.');
   };
 
   // ---------- Creatures (DM only) ----------
@@ -1678,6 +1872,160 @@
     session.tokens.push(clone);
     await pushRemote();
     renderCreatureList();
+  }
+
+  // ---------- Item template library (DM) ----------
+  function qualityOf(key){ return QUALITIES.find(q=>q.key===key) || QUALITIES[0]; }
+
+  function renderItemTemplateList(){
+    if(me.role !== 'dm') return;
+    const wrap = $('item-template-list');
+    wrap.innerHTML = '';
+    const templates = session.itemTemplates || [];
+    if(templates.length === 0){
+      const p = document.createElement('p');
+      p.style.color='var(--text-dim)'; p.style.fontSize='13px'; p.style.textAlign='center';
+      p.textContent = 'Henüz eşya yok. Aşağıdan yeni bir eşya oluşturabilirsin.';
+      wrap.appendChild(p);
+    }
+    templates.forEach(tpl => {
+      const q = qualityOf(tpl.quality);
+      const card = document.createElement('div');
+      card.className = 'item-tpl-card';
+      card.style.borderLeftColor = q.color;
+      card.onclick = () => openItemEditor(tpl.id);
+
+      const info = document.createElement('div'); info.className='tpl-info';
+      const nm = document.createElement('div'); nm.className='tpl-name'; nm.textContent = tpl.name;
+      const effectNames = (tpl.effects||[]).filter(e=>e && e.type!=='none').map(e=>EFFECT_DEFS[e.type]?EFFECT_DEFS[e.type].label:e.type);
+      const meta = document.createElement('div'); meta.className='tpl-meta';
+      meta.textContent = tpl.type + (effectNames.length ? ' · ' + effectNames.join(', ') : '');
+      info.appendChild(nm); info.appendChild(meta);
+      card.appendChild(info);
+
+      const badge = document.createElement('span'); badge.className='item-quality-badge';
+      badge.style.background = q.color+'26'; badge.style.color = q.color; badge.style.border = '1px solid '+q.color;
+      badge.textContent = q.label;
+      card.appendChild(badge);
+
+      wrap.appendChild(card);
+    });
+  }
+
+  $('btn-add-item-template').onclick = async () => {
+    const tpl = blankItemTemplate();
+    session.itemTemplates = session.itemTemplates || [];
+    session.itemTemplates.push(tpl);
+    await pushRemote();
+    openItemEditor(tpl.id);
+  };
+
+  let currentItemTemplateId = null;
+  function getCurrentTemplate(){ return (session.itemTemplates||[]).find(x=>x.id===currentItemTemplateId); }
+
+  function openItemEditor(id){
+    currentItemTemplateId = id;
+    renderItemEditor();
+    $('item-editor-screen').classList.add('open');
+  }
+  $('ie-back').onclick = () => {
+    $('item-editor-screen').classList.remove('open');
+    currentItemTemplateId = null;
+    renderItemTemplateList();
+  };
+  $('ie-delete').onclick = async () => {
+    const tpl = getCurrentTemplate();
+    if(!tpl) return;
+    session.itemTemplates = session.itemTemplates.filter(x=>x.id!==tpl.id);
+    await pushRemote();
+    $('item-editor-screen').classList.remove('open');
+    currentItemTemplateId = null;
+    renderItemTemplateList();
+  };
+
+  function renderItemEditor(){
+    const tpl = getCurrentTemplate();
+    if(!tpl) return;
+    $('ie-name').value = tpl.name;
+    $('ie-name').onchange = async () => { tpl.name = $('ie-name').value.trim() || tpl.name; $('ie-name').value = tpl.name; await pushRemote(); };
+
+    const typeSel = $('ie-type');
+    typeSel.innerHTML = '';
+    ITEM_TYPES.forEach(ty => {
+      const o = document.createElement('option'); o.value = ty; o.textContent = ty;
+      if(tpl.type === ty) o.selected = true;
+      typeSel.appendChild(o);
+    });
+    typeSel.onchange = async () => { tpl.type = typeSel.value; await pushRemote(); };
+
+    const qRow = $('ie-quality-row');
+    qRow.innerHTML = '';
+    QUALITIES.forEach(q => {
+      const sw = document.createElement('div');
+      sw.className = 'quality-swatch' + (tpl.quality===q.key ? ' sel':'');
+      sw.style.color = q.color;
+      const dot = document.createElement('span'); dot.className='dot'; dot.style.background=q.color;
+      sw.appendChild(dot);
+      sw.appendChild(document.createTextNode(q.label));
+      sw.onclick = async () => { tpl.quality = q.key; renderItemEditor(); await pushRemote(); };
+      qRow.appendChild(sw);
+    });
+
+    const effWrap = $('ie-effects');
+    effWrap.innerHTML = '';
+    for(let i=0;i<3;i++){
+      if(!tpl.effects[i]) tpl.effects[i] = blankEffect();
+      effWrap.appendChild(buildEffectSlotCard(tpl, i));
+    }
+  }
+
+  function buildEffectSlotCard(tpl, idx){
+    const card = document.createElement('div'); card.className = 'effect-slot-card';
+    const title = document.createElement('div'); title.className='es-title'; title.textContent = 'EFEKT '+(idx+1);
+    card.appendChild(title);
+
+    const sel = document.createElement('select');
+    const noneOpt = document.createElement('option'); noneOpt.value='none'; noneOpt.textContent='Yok';
+    sel.appendChild(noneOpt);
+    Object.keys(EFFECT_DEFS).forEach(key => {
+      if(key==='none') return;
+      const o = document.createElement('option'); o.value = key; o.textContent = EFFECT_DEFS[key].label;
+      if(tpl.effects[idx].type === key) o.selected = true;
+      sel.appendChild(o);
+    });
+    if(tpl.effects[idx].type==='none') sel.value='none';
+    sel.onchange = async () => {
+      tpl.effects[idx] = { type: sel.value, params: {} };
+      renderItemEditor();
+      await pushRemote();
+    };
+    card.appendChild(sel);
+
+    const def = EFFECT_DEFS[tpl.effects[idx].type] || EFFECT_DEFS.none;
+    def.params.forEach(p => {
+      const lbl = document.createElement('label'); lbl.className='effect-param-label'; lbl.textContent = p.label;
+      card.appendChild(lbl);
+      let input;
+      if(p.type === 'select'){
+        input = document.createElement('select');
+        p.options.forEach(optVal => {
+          const o = document.createElement('option'); o.value = optVal; o.textContent = optVal;
+          if((tpl.effects[idx].params[p.key]||'') === optVal) o.selected = true;
+          input.appendChild(o);
+        });
+      } else {
+        input = document.createElement('input');
+        input.type = p.type === 'number' ? 'number' : 'text';
+        if(p.placeholder) input.placeholder = p.placeholder;
+        input.value = tpl.effects[idx].params[p.key] != null ? tpl.effects[idx].params[p.key] : '';
+      }
+      input.onchange = async () => {
+        tpl.effects[idx].params[p.key] = input.value;
+        await pushRemote();
+      };
+      card.appendChild(input);
+    });
+    return card;
   }
 
   async function toggleCreatureBattle(id){
