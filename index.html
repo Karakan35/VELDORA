@@ -105,6 +105,20 @@
     100%{ opacity:0; transform:scale(.15) rotate(30deg); }
   }
   .token.token-dying{ animation:tokenDeath .65s ease forwards; pointer-events:none; }
+  @keyframes floatUp{
+    0%{ transform:translateY(0); opacity:1; }
+    100%{ transform:translateY(-34px); opacity:0; }
+  }
+  .float-number{
+    position:absolute; font-family:'Cinzel',serif; font-weight:700; font-size:16px;
+    pointer-events:none; animation:floatUp .9s ease forwards; z-index:6; white-space:nowrap;
+  }
+  .float-number.heal{ color:var(--ok); text-shadow:0 0 8px rgba(111,143,90,.85); }
+  .float-number.dmg{ color:var(--ember-bright); text-shadow:0 0 8px rgba(226,99,42,.85); }
+  @keyframes healGlow{ 0%{ box-shadow:0 0 0 0 rgba(111,143,90,.9); } 100%{ box-shadow:0 0 20px 8px rgba(111,143,90,0); } }
+  @keyframes dmgGlow{ 0%{ box-shadow:0 0 0 0 rgba(226,99,42,.9); } 100%{ box-shadow:0 0 20px 8px rgba(226,99,42,0); } }
+  .token-heal-glow{ animation:healGlow .55s ease; }
+  .token-damage-glow{ animation:dmgGlow .55s ease; }
   .token{
     position:absolute; border-radius:50%; display:flex; align-items:center; justify-content:center;
     font-family:'Cinzel',serif; font-weight:700; color:#1a1220; font-size:13px;
@@ -222,6 +236,8 @@
   .stat-box label{ display:block; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-dim); margin-bottom:4px;}
   .stat-box div{ font-family:'Cinzel',serif; font-size:18px; color:var(--gold-bright); font-weight:700; }
   .calc-hint{ font-size:10.5px; color:var(--text-dim); line-height:1.5; margin:8px 0 20px; }
+  .effective-hint{ color:var(--gold-bright); font-weight:700; text-transform:none; letter-spacing:0; font-size:11px; }
+  .skill-bonus{ font-size:11px; color:var(--gold-bright); font-weight:700; margin-left:6px; white-space:nowrap; align-self:center; }
   .dice-btn{
     width:100%; padding:14px; border-radius:8px; margin-bottom:10px;
     background:linear-gradient(180deg,var(--gold-bright),var(--gold)); color:#241a08; font-weight:700; font-size:15px;
@@ -600,8 +616,8 @@
       <div class="field"><label>Düz Hasar Bonusu</label><input id="sheet-meleedmg" type="number"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Fiziksel AC</label><input id="sheet-acphys" type="number"></div>
-      <div class="field"><label>Büyüsel AC</label><input id="sheet-acmag" type="number"></div>
+      <div class="field"><label>Fiziksel AC <span class="effective-hint" id="ac-phys-effective"></span></label><input id="sheet-acphys" type="number"></div>
+      <div class="field"><label>Büyüsel AC <span class="effective-hint" id="ac-mag-effective"></span></label><input id="sheet-acmag" type="number"></div>
     </div>
     <p class="calc-hint" id="melee-calc-hint">Düz Vuruş Hasarı = 1 + Düz Hasar Bonusu · Menzil 1 ise Yakın Dövüş, 2+ ise Atıcılık zarı atılır.</p>
 
@@ -1106,6 +1122,7 @@
     if($('inv-tab').classList.contains('active')) renderInventoryTab();
     if($('creatures-tab').classList.contains('active')) renderCreatureList();
     if($('items-tab').classList.contains('active')) renderItemTemplateList();
+    flushFloatingNumbers();
   }
 
   function updateEndTurnButton(){
@@ -1513,20 +1530,22 @@
     const t = session.tokens.find(x=>x.id===id);
     if(!t) return;
     const max = stat==='hp' ? getMaxHp(t) : getMaxMp(t);
-    t[stat] = Math.max(0, Math.min(max, (t[stat]||0) + delta));
+    const before = t[stat]||0;
+    t[stat] = Math.max(0, Math.min(max, before + delta));
     await pushRemote();
     renderCharList(); renderGrid();
-    if(stat==='hp') checkDeath(t);
+    if(stat==='hp'){ queueFloat(t.id, t.hp - before); flushFloatingNumbers(); checkDeath(t); }
   }
 
   async function setStatExact(id, stat, value){
     const t = session.tokens.find(x=>x.id===id);
     if(!t) return;
     const max = stat==='hp' ? getMaxHp(t) : getMaxMp(t);
+    const before = t[stat]||0;
     t[stat] = Math.max(0, Math.min(max, value||0));
     await pushRemote();
     renderCharList(); renderGrid();
-    if(stat==='hp') checkDeath(t);
+    if(stat==='hp'){ queueFloat(t.id, t.hp - before); flushFloatingNumbers(); checkDeath(t); }
   }
 
   function checkDeath(t){
@@ -1535,6 +1554,36 @@
     } else if(t.kind!=='creature' && t.hp<=0){
       checkRevive(t);
     }
+  }
+
+  // ---------- Floating heal/damage numbers ----------
+  let pendingFloats = [];
+  function queueFloat(tokenId, delta){ if(delta) pendingFloats.push({tokenId, delta}); }
+  function flushFloatingNumbers(){
+    const q = pendingFloats; pendingFloats = [];
+    q.forEach(f => showFloatingNumber(f.tokenId, f.delta));
+  }
+  function showFloatingNumber(tokenId, delta){
+    if(!delta) return;
+    const t = session.tokens.find(x=>x.id===tokenId);
+    if(!t) return;
+    const grid = $('grid');
+    if(!grid) return;
+    let foundEl = null;
+    grid.querySelectorAll('.token').forEach(el => {
+      if(parseInt(el.style.left)===t.col*CELL+4 && parseInt(el.style.top)===t.row*CELL+4) foundEl = el;
+    });
+    if(!foundEl) return; // Aksiyon sekmesinde görünmüyorsa animasyonu atla
+    const isHeal = delta > 0;
+    foundEl.classList.add(isHeal ? 'token-heal-glow' : 'token-damage-glow');
+    setTimeout(() => foundEl.classList.remove(isHeal ? 'token-heal-glow' : 'token-damage-glow'), 550);
+    const float = document.createElement('div');
+    float.className = 'float-number ' + (isHeal ? 'heal' : 'dmg');
+    float.textContent = (isHeal ? '+' : '') + delta;
+    float.style.left = foundEl.style.left;
+    float.style.top = foundEl.style.top;
+    grid.appendChild(float);
+    setTimeout(() => float.remove(), 900);
   }
 
   function playDeathAnimation(id){
@@ -1644,6 +1693,9 @@
     $('sheet-meleedmg').value = t.sheet.meleeDamageBonus || 0;
     $('sheet-acphys').value = t.sheet.acPhysical != null ? t.sheet.acPhysical : 5;
     $('sheet-acmag').value = t.sheet.acMagical != null ? t.sheet.acMagical : 5;
+    const effPhys = getEffectiveAC(t, false), effMag = getEffectiveAC(t, true);
+    $('ac-phys-effective').textContent = effPhys !== $('sheet-acphys').value*1 ? ('(bonuslu: '+effPhys+')') : '';
+    $('ac-mag-effective').textContent = effMag !== $('sheet-acmag').value*1 ? ('(bonuslu: '+effMag+')') : '';
     $('sheet-fixedhp').value = t.sheet.fixedMaxHp != null ? t.sheet.fixedMaxHp : getMaxHp(t);
     $('sheet-fixedmp').value = t.sheet.fixedMaxMp != null ? t.sheet.fixedMaxMp : getMaxMp(t);
     [$('sheet-name'), $('sheet-class'), $('sheet-level'), $('sheet-hpbonus'), $('sheet-manabonus'),
@@ -1686,9 +1738,20 @@
       const val = document.createElement('input');
       val.className = 'skill-val'; val.type = 'number'; val.value = s.value;
       val.disabled = !editable;
-      val.onchange = () => { s.value = parseInt(val.value)||0; val.value = s.value; recalcAndSave(t); };
+      val.onchange = () => { s.value = parseInt(val.value)||0; val.value = s.value; recalcAndSave(t); renderSheet(t); };
 
       row.appendChild(label); row.appendChild(cat); row.appendChild(val);
+
+      if((s.label||'').trim()){
+        const effective = findSkillValue(t, s.label.trim().toUpperCase());
+        const base = parseInt(s.value)||0;
+        if(effective !== base){
+          const bonus = document.createElement('span');
+          bonus.className = 'skill-bonus';
+          bonus.textContent = '→ ' + effective;
+          row.appendChild(bonus);
+        }
+      }
       list.appendChild(row);
     });
     $('btn-add-skill').style.display = editable ? 'block' : 'none';
@@ -2077,7 +2140,7 @@
     const tpl = getCurrentTemplate();
     if(!tpl) return;
     $('ie-name').value = tpl.name;
-    $('ie-name').onchange = async () => { tpl.name = $('ie-name').value.trim() || tpl.name; $('ie-name').value = tpl.name; await pushRemote(); };
+    $('ie-name').oninput = debounce(() => { tpl.name = $('ie-name').value.trim() || tpl.name; pushRemote(); }, 350);
 
     const typeSel = $('ie-type');
     typeSel.innerHTML = '';
@@ -2140,7 +2203,13 @@
     return card;
   }
 
+  function debounce(fn, wait){
+    let timer = null;
+    return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), wait); };
+  }
+
   function renderParamFields(card, params, paramsObj, onChange){
+    const debouncedSave = debounce(onChange, 350);
     params.forEach(p => {
       const lbl = document.createElement('label'); lbl.className='effect-param-label'; lbl.textContent = p.label;
       card.appendChild(lbl);
@@ -2152,13 +2221,15 @@
           if((paramsObj[p.key]||'') === optVal) o.selected = true;
           input.appendChild(o);
         });
+        input.onchange = () => { paramsObj[p.key] = input.value; pushRemote(); };
       } else {
         input = document.createElement('input');
         input.type = p.type === 'number' ? 'number' : 'text';
         if(p.placeholder) input.placeholder = p.placeholder;
         input.value = paramsObj[p.key] != null ? paramsObj[p.key] : '';
+        // her tuş vuruşunda hemen kaydet — dokunup çıkmayı beklemez, uzağa kaydedilmesi hafifçe geciktirilir
+        input.oninput = () => { paramsObj[p.key] = input.value; debouncedSave(); };
       }
-      input.onchange = async () => { paramsObj[p.key] = input.value; await onChange(); };
       card.appendChild(input);
     });
   }
@@ -2211,7 +2282,7 @@
       const lbl4 = document.createElement('label'); lbl4.className='effect-param-label'; lbl4.textContent='Süre (Tur)';
       card.appendChild(lbl4);
       const durInp = document.createElement('input'); durInp.type='number'; durInp.value = params.duration!=null?params.duration:'';
-      durInp.onchange = async () => { params.duration = durInp.value; await pushRemote(); };
+      durInp.oninput = () => { params.duration = durInp.value; pushRemote(); };
       card.appendChild(durInp);
     }
 
@@ -2330,6 +2401,7 @@
     await pushRemote();
     renderAll();
     checkDeath(target);
+    flushFloatingNumbers();
   }
 
   async function resolveAbility(actor, target, ability){
@@ -2356,16 +2428,21 @@
     await pushRemote();
     renderAll();
     checkDeath(target);
+    flushFloatingNumbers();
   }
 
   function applyDamageWithExecute(actor, target, dmg, isMagic){
+    const before = target.hp;
     target.hp = Math.max(0, target.hp - dmg);
+    queueFloat(target.id, target.hp - before);
     getEquippedEffects(actor).forEach(({eff}) => {
       if(eff.type==='execute' && target.hp>0){
         const threshold = parseFloat(eff.params.threshold)||0;
         if((target.hp / getMaxHp(target))*100 <= threshold){
           const extra = rollDiceExpr(eff.params.extraDamage);
+          const before2 = target.hp;
           target.hp = Math.max(0, target.hp - extra);
+          queueFloat(target.id, target.hp - before2);
           logSystemEvent(target.name + ' infaz edildi! Ekstra ' + extra + ' hasar aldı.');
         }
       }
@@ -2377,7 +2454,9 @@
       if(eff.type==='lifesteal' && dmg>0){
         const heal = Math.round(dmg * (parseFloat(eff.params.percent)||0)/100);
         if(heal>0){
+          const before = actor.hp;
           actor.hp = Math.min(getMaxHp(actor), actor.hp + heal);
+          queueFloat(actor.id, actor.hp - before);
           logSystemEvent(actor.name + ' can çalarak ' + heal + ' can kazandı.');
         }
       }
@@ -2387,7 +2466,9 @@
         if(eff.type==='thorns' && dmg>0){
           const reflect = resolveAmountValue(eff.params.amount, dmg);
           if(reflect>0){
+            const before = actor.hp;
             actor.hp = Math.max(0, actor.hp - reflect);
+            queueFloat(actor.id, actor.hp - before);
             logSystemEvent(target.name + '\'in dikenleri ' + actor.name + '\'e ' + reflect + ' hasar verdi.');
             checkDeath(actor);
           }
@@ -2408,14 +2489,18 @@
     switch(effect.type){
       case 'heal': {
         const amt = rollDiceExpr(effect.params.amount);
+        const before = target.hp;
         target.hp = Math.min(getMaxHp(target), target.hp + amt);
+        queueFloat(target.id, target.hp - before);
         logSystemEvent(target.name + ' ' + sourceName + ' ile ' + amt + ' can yeniledi.');
         break;
       }
       case 'maxHpBoost': {
         const amt = parseInt(effect.params.amount)||0;
         target.sheet.hpBonus = (target.sheet.hpBonus||0) + amt;
+        const before = target.hp;
         target.hp = Math.min(getMaxHp(target), target.hp + amt);
+        queueFloat(target.id, target.hp - before);
         logSystemEvent(target.name + ' ' + sourceName + ' ile maksimum canı ' + amt + ' arttı.');
         break;
       }
@@ -2453,10 +2538,13 @@
             case 'movementBoost':
               target.sheet.moveBonus = (target.sheet.moveBonus||0) + signed;
               break;
-            case 'maxHpBoost':
+            case 'maxHpBoost': {
               target.sheet.hpBonus = (target.sheet.hpBonus||0) + signed;
+              const before = target.hp;
               target.hp = Math.max(0, Math.min(getMaxHp(target), target.hp + signed));
+              queueFloat(target.id, target.hp - before);
               break;
+            }
           }
           logSystemEvent(target.name + ' üzerine kalıcı ' + verb + ' işledi (' + sourceName + ').');
         } else {
@@ -2503,11 +2591,15 @@
     for(const se of t.statusEffects){
       if(se.effectType==='dot'){
         const dmg = rollDiceExpr(se.params.damage);
+        const before = t.hp;
         t.hp = Math.max(0, t.hp - dmg);
+        queueFloat(t.id, t.hp - before);
         logSystemEvent(t.name + ' ' + (se.params.damageType||'hasar') + ' etkisiyle ' + dmg + ' hasar aldı.');
       } else if(se.effectType==='hot'){
         const heal = rollDiceExpr(se.params.heal);
+        const before = t.hp;
         t.hp = Math.min(getMaxHp(t), t.hp + heal);
+        queueFloat(t.id, t.hp - before);
         logSystemEvent(t.name + ' ' + heal + ' can yeniledi.');
       }
       se.remaining = (se.remaining||1) - 1;
@@ -2653,32 +2745,32 @@
       const nameInp = document.createElement('input');
       nameInp.className = 'ability-name'; nameInp.value = ab.name || ''; nameInp.placeholder = 'Yetenek adı';
       nameInp.disabled = !editable;
-      nameInp.onchange = () => { ab.name = nameInp.value; pushRemote(); };
+      nameInp.oninput = debounce(() => { ab.name = nameInp.value; pushRemote(); }, 350);
       card.appendChild(nameInp);
 
       const descInp = document.createElement('textarea');
       descInp.className = 'ability-desc'; descInp.value = ab.desc || ''; descInp.placeholder = 'Açıklama';
       descInp.disabled = !editable;
-      descInp.onchange = () => { ab.desc = descInp.value; pushRemote(); };
+      descInp.oninput = debounce(() => { ab.desc = descInp.value; pushRemote(); }, 350);
       card.appendChild(descInp);
 
       const grid = document.createElement('div'); grid.className = 'ability-grid';
       const manaWrap = document.createElement('div');
       manaWrap.innerHTML = '<label>Mana Bedeli</label>';
       const manaInp = document.createElement('input'); manaInp.type='number'; manaInp.value = ab.manaCost||0; manaInp.disabled=!editable;
-      manaInp.onchange = () => { ab.manaCost = parseInt(manaInp.value)||0; pushRemote(); };
+      manaInp.oninput = debounce(() => { ab.manaCost = parseInt(manaInp.value)||0; pushRemote(); }, 350);
       manaWrap.appendChild(manaInp);
 
       const rangeWrap = document.createElement('div');
       rangeWrap.innerHTML = '<label>Menzil</label>';
       const rangeInp = document.createElement('input'); rangeInp.type='number'; rangeInp.min=1; rangeInp.value = ab.range||1; rangeInp.disabled=!editable;
-      rangeInp.onchange = () => { ab.range = Math.max(1, parseInt(rangeInp.value)||1); pushRemote(); };
+      rangeInp.oninput = debounce(() => { ab.range = Math.max(1, parseInt(rangeInp.value)||1); pushRemote(); }, 350);
       rangeWrap.appendChild(rangeInp);
 
       const dmgWrap = document.createElement('div');
       dmgWrap.innerHTML = '<label>Hasar</label>';
       const dmgInp = document.createElement('input'); dmgInp.type='number'; dmgInp.value = ab.damage||0; dmgInp.disabled=!editable;
-      dmgInp.onchange = () => { ab.damage = parseInt(dmgInp.value)||0; pushRemote(); };
+      dmgInp.oninput = debounce(() => { ab.damage = parseInt(dmgInp.value)||0; pushRemote(); }, 350);
       dmgWrap.appendChild(dmgInp);
 
       grid.appendChild(manaWrap); grid.appendChild(rangeWrap); grid.appendChild(dmgWrap);
