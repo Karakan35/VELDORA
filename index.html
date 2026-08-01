@@ -123,6 +123,14 @@
   .token-heal-glow{ animation:healGlow .55s ease; }
   .token-damage-glow{ animation:dmgGlow .55s ease; }
   .token-mana-glow{ animation:manaGlow .55s ease; }
+  @keyframes tokenShake{
+    0%, 100%{ transform:translate(0,0); }
+    20%{ transform:translate(-4px,1px); }
+    40%{ transform:translate(4px,-1px); }
+    60%{ transform:translate(-3px,1px); }
+    80%{ transform:translate(3px,-1px); }
+  }
+  .token-shake{ animation:tokenShake .4s ease; }
   .token{
     position:absolute; border-radius:50%; display:flex; align-items:center; justify-content:center;
     font-family:'Cinzel',serif; font-weight:700; color:#1a1220; font-size:13px;
@@ -135,6 +143,10 @@
     position:absolute; bottom:-6px; left:8%; width:84%; height:4px; background:#000a; border-radius:3px; overflow:hidden;
   }
   .token .hp-bar-mini i{ display:block; height:100%; background:var(--ok);}
+  .token .mp-bar-mini{
+    position:absolute; bottom:-11px; left:8%; width:84%; height:3px; background:#000a; border-radius:3px; overflow:hidden;
+  }
+  .token .mp-bar-mini i{ display:block; height:100%; background:var(--mana);}
   .element-badge{
     position:absolute; top:-9px; right:-6px; font-size:13px; line-height:1; filter:drop-shadow(0 1px 2px rgba(0,0,0,.7));
     pointer-events:none;
@@ -343,6 +355,8 @@
   #creatures-tab.active{ display:block; }
   #items-tab{ padding:14px; display:none; }
   #items-tab.active{ display:block; }
+  #abilities-tab{ padding:14px; display:none; }
+  #abilities-tab.active{ display:block; }
   .item-card{
     display:flex; align-items:center; gap:10px; background:var(--ink-2); border:1px solid var(--line);
     border-radius:8px; padding:10px 12px; margin-bottom:8px;
@@ -454,6 +468,7 @@
         </div>
         <div class="map-hint" id="map-hint">Bir karaktere dokun, ne yapmak istediğini seç.</div>
         <button class="ghost-btn" id="btn-paint-terrain" style="width:100%; display:none;">🗺 Zemin Boya</button>
+        <button class="ghost-btn" id="btn-lock-terrain" style="width:100%; display:none; margin-top:8px;">🔒 Zemin Kilitle / Aç</button>
 
         <div class="dice-panel">
           <h3 class="sheet-section-title">ZAR AT</h3>
@@ -487,11 +502,19 @@
         <div id="item-template-list"></div>
         <button class="add-char-btn" id="btn-add-item-template">+ Yeni Eşya</button>
       </div>
+
+      <div id="abilities-tab">
+        <div class="dice-char-row" id="abilities-char-row"></div>
+        <h3 class="sheet-section-title" id="abilities-header" style="margin-top:10px;">YETENEKLER</h3>
+        <div id="abilities-list"></div>
+        <button class="ghost-btn" id="btn-add-ability" style="display:none;">+ Yeni Yetenek Ekle</button>
+      </div>
     </div>
 
     <div class="tabbar">
       <button id="tab-btn-map" class="active"><span class="ic">⚔</span>Aksiyon</button>
       <button id="tab-btn-chars"><span class="ic">🛡</span>Karakterler</button>
+      <button id="tab-btn-abilities"><span class="ic">✨</span>Yetenekler</button>
       <button id="tab-btn-inv"><span class="ic">🎒</span>Envanter</button>
       <button id="tab-btn-creatures" style="display:none;"><span class="ic">🐉</span>Yaratıklar</button>
       <button id="tab-btn-items" style="display:none;"><span class="ic">💎</span>Eşyalar</button>
@@ -630,10 +653,7 @@
       <div class="field"><label>Büyüsel AC <span class="effective-hint" id="ac-mag-effective"></span></label><input id="sheet-acmag" type="number"></div>
     </div>
     <p class="calc-hint" id="melee-calc-hint">Düz Vuruş Hasarı = 1 + Düz Hasar Bonusu · Menzil 1 ise Yakın Dövüş, 2+ ise Atıcılık zarı atılır.</p>
-
-    <h3 class="sheet-section-title" style="margin-top:22px;" id="abilities-header">YETENEKLER</h3>
-    <div id="abilities-list"></div>
-    <button class="ghost-btn" id="btn-add-ability">+ Yeni Yetenek Ekle</button>
+    <p class="calc-hint">Yetenekleri alttaki "Yetenekler" sekmesinden düzenleyebilirsin.</p>
 
     <h3 class="sheet-section-title" style="margin-top:22px;">ÖZELLİKLER</h3>
     <div id="skills-list"></div>
@@ -723,6 +743,8 @@
   ];
   const EFFECT_DEFS = {
     none:     { label:'Yok', params:[] },
+    damage:   { label:'Hasar', params:[
+                  {key:'amount', label:'Miktar', type:'text', placeholder:'ör. 10 ya da 2d6'} ] },
     heal:     { label:'İyileştirme (Heal)', params:[
                   {key:'amount', label:'Miktar', type:'text', placeholder:'ör. 10 ya da 2d6'} ] },
     dot:      { label:'Zamana Yayılı Hasar (D.O.T)', params:[
@@ -1171,21 +1193,25 @@
   // ---------- Tabs ----------
   $('tab-btn-map').onclick = () => switchTab('map');
   $('tab-btn-chars').onclick = () => switchTab('chars');
+  $('tab-btn-abilities').onclick = () => switchTab('abilities');
   $('tab-btn-inv').onclick = () => switchTab('inv');
   $('tab-btn-creatures').onclick = () => switchTab('creatures');
   $('tab-btn-items').onclick = () => switchTab('items');
   function switchTab(t){
     $('map-tab').classList.toggle('active', t==='map');
     $('chars-tab').classList.toggle('active', t==='chars');
+    $('abilities-tab').classList.toggle('active', t==='abilities');
     $('inv-tab').classList.toggle('active', t==='inv');
     $('creatures-tab').classList.toggle('active', t==='creatures');
     $('items-tab').classList.toggle('active', t==='items');
     $('tab-btn-map').classList.toggle('active', t==='map');
     $('tab-btn-chars').classList.toggle('active', t==='chars');
+    $('tab-btn-abilities').classList.toggle('active', t==='abilities');
     $('tab-btn-inv').classList.toggle('active', t==='inv');
     $('tab-btn-creatures').classList.toggle('active', t==='creatures');
     $('tab-btn-items').classList.toggle('active', t==='items');
     if(t==='map') renderDicePanel();
+    if(t==='abilities') renderAbilitiesTab();
     if(t==='inv') renderInventoryTab();
     if(t==='creatures') renderCreatureList();
     if(t==='items') renderItemTemplateList();
@@ -1308,6 +1334,7 @@
     if($('inv-tab').classList.contains('active')) renderInventoryTab();
     if($('creatures-tab').classList.contains('active')) renderCreatureList();
     if($('items-tab').classList.contains('active')) renderItemTemplateList();
+    if($('abilities-tab').classList.contains('active')) renderAbilitiesTab();
     flushFloatingNumbers();
   }
 
@@ -1316,6 +1343,7 @@
     const canEnd = active && (me.role==='dm' || active.owner===me.name);
     $('btn-end-turn').style.display = canEnd ? 'block' : 'none';
     $('btn-paint-terrain').style.display = me.role==='dm' ? 'block' : 'none';
+    $('btn-lock-terrain').style.display = me.role==='dm' ? 'block' : 'none';
   }
   $('btn-end-turn').onclick = endTurn;
 
@@ -1331,6 +1359,23 @@
     }, '');
   };
 
+  $('btn-lock-terrain').onclick = () => {
+    actionMode = (actionMode==='lockTerrain') ? null : 'lockTerrain';
+    actingTokenId = null;
+    renderGrid();
+  };
+
+  async function toggleTerrainLock(row, col){
+    if(me.role !== 'dm') return;
+    const key = row+','+col;
+    const cell = session.terrain[key];
+    if(!cell || !cell.type){ return; } // sadece zemini olan kareler kilitlenebilir
+    cell.locked = !cell.locked;
+    logSystemEvent((terrainDef(cell.type)||{}).label + ' zemini ' + (cell.locked?'kilitlendi.':'kilidi açıldı.'));
+    await pushRemote();
+    renderAll();
+  }
+
   function renderRollLog(){
     const wrap = $('roll-log');
     wrap.innerHTML = '';
@@ -1345,7 +1390,7 @@
         chip.innerHTML = esc(r.charName) + ': <b>' + r.roll + (r.bonus?(' +'+r.bonus):'') + ' = ' + r.total + '</b>' + esc(label) + ' — ' + outcome;
       } else if(r.combat){
         const label = r.skillLabel ? (' ('+r.skillLabel+')') : '';
-        const outcome = r.hit ? ('İSABET · '+r.dmg+' hasar') : 'ISKALADI';
+        const outcome = r.hit ? ((r.dmg!=null && !isNaN(r.dmg)) ? ('İSABET · '+r.dmg+' hasar') : 'İSABET') : 'ISKALADI';
         chip.innerHTML = esc(r.charName) + ' → ' + esc(r.targetName) + ': <b>' + r.roll + (r.bonus?(' +'+r.bonus):'') + ' = ' + r.total + '</b>' + esc(label) + ' vs AC ' + r.ac + ' — ' + outcome;
       } else if(r.itemUse){
         chip.innerHTML = esc(r.charName) + ': <b>' + esc(r.itemName) + '</b> kullanıldı';
@@ -1386,7 +1431,7 @@
     const round = session.roundNumber || 1;
     Object.keys(session.terrain||{}).forEach(key => {
       const cell = session.terrain[key];
-      if(!cell || cell.manual) return;
+      if(!cell || cell.manual || cell.locked) return;
       if(round - (cell.createdRound||round) >= 2){
         delete session.terrain[key];
       }
@@ -1427,6 +1472,60 @@
   function terrainKeyForElement(elementType){
     const def = TERRAIN_TYPES.find(t => t.element===elementType);
     return def ? def.key : null;
+  }
+
+  // İki farklı element zemin üzerinde çarpıştığında zemin ne olur (null = zemin temizlenir, undefined = eşleşme yok/normal boyama)
+  const TERRAIN_REACTION_OUTCOME = {
+    'islak+yanma':    null,      // buharlaşma: zemin temizlenir
+    'islak+elektrik': 'islak',   // şok sönümlenir, su kalır
+    'islak+soguk':    'buzlu',   // donar, buz zemin olur
+    'yanma+soguk':    'islak',   // erir, su olur
+    'yanma+elektrik': null,      // patlama: zemin temizlenir
+    'elektrik+soguk': null       // nötrlenir: zemin temizlenir
+  };
+
+  // Bir hücreye elementel bir etki (büyü/yetenek) geldiğinde zeminin de birimler gibi tepki vermesini sağlar.
+  // Kilitli zeminler asla değişmez ama üzerindeki birimler yine de reaksiyondan etkilenir (ör. göl her zaman sudur).
+  function resolveTerrainHit(row, col, incomingElement, sourceLabel){
+    const key = row+','+col;
+    const incomingTerrainKey = terrainKeyForElement(incomingElement);
+    if(!incomingTerrainKey) return;
+    const existing = session.terrain[key];
+
+    if(!existing || !existing.type){
+      session.terrain[key] = { type: incomingTerrainKey, manual:false, locked:false, createdRound: session.roundNumber };
+      return;
+    }
+    const existingDef = terrainDef(existing.type);
+    const existingElement = existingDef ? existingDef.element : null;
+
+    if(!existingElement || existingElement === incomingElement){
+      if(!existing.locked){
+        session.terrain[key] = { type: incomingTerrainKey, manual:existing.manual, locked:existing.locked, createdRound: session.roundNumber };
+      }
+      return;
+    }
+
+    // farklı element: önce üstündeki birimlere reaksiyonu uygula
+    const unitsHere = session.tokens.filter(x => (x.kind!=='creature'||x.inBattle) && x.row===row && x.col===col);
+    unitsHere.forEach(u => resolveElementReaction(u, incomingElement, sourceLabel));
+
+    if(existing.locked){
+      logSystemEvent((terrainDef(existing.type)||{}).label + ' zemini kilitli, değişmedi.');
+      return; // kilitli zemin değişmez
+    }
+
+    const outcomeKey = existingElement+'+'+incomingElement;
+    const outcomeKeyRev = incomingElement+'+'+existingElement;
+    const outcome = (outcomeKey in TERRAIN_REACTION_OUTCOME) ? TERRAIN_REACTION_OUTCOME[outcomeKey]
+                   : (outcomeKeyRev in TERRAIN_REACTION_OUTCOME) ? TERRAIN_REACTION_OUTCOME[outcomeKeyRev] : undefined;
+    if(outcome === undefined){
+      session.terrain[key] = { type: incomingTerrainKey, manual:false, locked:false, createdRound: session.roundNumber };
+    } else if(outcome === null){
+      delete session.terrain[key];
+    } else {
+      session.terrain[key] = { type: outcome, manual:false, locked:false, createdRound: session.roundNumber };
+    }
   }
 
   function computeReachableCells(actor){
@@ -1477,10 +1576,21 @@
       el.style.width = CELL+'px'; el.style.height = CELL+'px';
       el.style.background = def.color + '4d';
       el.style.borderColor = def.color;
-      el.title = def.label;
+      el.title = def.label + (cellData.locked ? ' (kilitli)' : '');
+      if(cellData.locked){
+        el.style.boxShadow = 'inset 0 0 0 2px #fff8';
+        const lockIcon = document.createElement('div');
+        lockIcon.textContent = '🔒';
+        lockIcon.style.position = 'absolute'; lockIcon.style.top = '1px'; lockIcon.style.left = '1px';
+        lockIcon.style.fontSize = '9px'; lockIcon.style.lineHeight = '1';
+        el.appendChild(lockIcon);
+      }
       if(actionMode==='terrain'){
         el.style.cursor = 'pointer';
         el.onclick = () => paintTerrainCell(r,c);
+      } else if(actionMode==='lockTerrain'){
+        el.style.cursor = 'pointer';
+        el.onclick = () => toggleTerrainLock(r,c);
       }
       grid.appendChild(el);
     });
@@ -1583,6 +1693,16 @@
       fill.style.background = hpColor(t.hp/getMaxHp(t));
       bar.appendChild(fill);
       el.appendChild(bar);
+
+      const maxMp = getMaxMp(t);
+      if(maxMp > 0){
+        const mbar = document.createElement('div');
+        mbar.className = 'mp-bar-mini';
+        const mfill = document.createElement('i');
+        mfill.style.width = Math.max(0, Math.min(100, ((t.mp||0)/maxMp)*100)) + '%';
+        mbar.appendChild(mfill);
+        el.appendChild(mbar);
+      }
       el.onclick = (ev) => { ev.stopPropagation(); onTokenTap(t, isTarget); };
       grid.appendChild(el);
     });
@@ -1612,6 +1732,10 @@
     } else if(actionMode==='terrain'){
       banner.classList.add('show');
       $('mode-banner-text').textContent = 'Zemin Boya (' + (terrainPaintDef ? terrainPaintDef.label : '') + '): boyamak istediğin kareye dokun';
+      hint.style.display = 'none';
+    } else if(actionMode==='lockTerrain'){
+      banner.classList.add('show');
+      $('mode-banner-text').textContent = 'Zemin Kilitle: kilitlemek/açmak istediğin zemine dokun';
       hint.style.display = 'none';
     } else {
       banner.classList.remove('show');
@@ -1646,7 +1770,7 @@
     if(terrainPaintDef === null){
       delete session.terrain[key];
     } else {
-      session.terrain[key] = { type: terrainPaintDef.key, manual:true, createdRound: session.roundNumber };
+      session.terrain[key] = { type: terrainPaintDef.key, manual:true, locked:false, createdRound: session.roundNumber };
     }
     await pushRemote();
     renderGrid();
@@ -1922,6 +2046,10 @@
     const numClass = isMana ? 'mana' : (isHeal ? 'heal' : 'dmg');
     foundEl.classList.add(glowClass);
     setTimeout(() => foundEl.classList.remove(glowClass), 550);
+    if(!isMana && !isHeal){
+      foundEl.classList.add('token-shake');
+      setTimeout(() => foundEl.classList.remove('token-shake'), 400);
+    }
     const float = document.createElement('div');
     float.className = 'float-number ' + numClass;
     float.textContent = (delta>0 ? '+' : '') + delta;
@@ -2051,7 +2179,6 @@
     $('creature-stat-block').style.display = isCreature ? 'block' : 'none';
     $('melee-settings-row').style.display = 'flex';
     $('melee-calc-hint').style.display = 'block';
-    $('abilities-header').textContent = isCreature ? 'SALDIRI YETENEKLERİ' : 'YETENEKLER';
 
     updateCalcDisplay(t);
 
@@ -2060,7 +2187,6 @@
     else{ img.style.display='none'; ph.style.display='block'; }
     $('portrait-wrap').style.cursor = editable ? 'pointer' : 'default';
 
-    renderAbilitiesList(t, editable);
 
     const list = $('skills-list');
     list.innerHTML = '';
@@ -2167,6 +2293,37 @@
 
   let invCharId = null;
   let invSubTab = 'players'; // sadece DM için: 'players' | 'creatures'
+
+  let abilitiesCharId = null;
+  function renderAbilitiesTab(){
+    const mine = session.tokens.filter(t => canControl(t));
+    let sel = mine.find(t => t.id === abilitiesCharId);
+    if(!sel){ sel = mine[0]; abilitiesCharId = sel ? sel.id : null; }
+
+    const row = $('abilities-char-row');
+    row.innerHTML = '';
+    mine.forEach(t => {
+      const b = document.createElement('button');
+      b.className = 'dice-char-chip' + (sel && t.id===sel.id ? ' active':'');
+      b.textContent = t.name;
+      b.onclick = () => { abilitiesCharId = t.id; renderAbilitiesTab(); };
+      row.appendChild(b);
+    });
+
+    if(!sel){
+      $('abilities-header').textContent = 'YETENEKLER';
+      $('abilities-list').innerHTML = '';
+      $('btn-add-ability').style.display = 'none';
+      const p = document.createElement('p');
+      p.className='map-hint'; p.style.marginTop='0';
+      p.textContent = 'Yetenekleri görüntülemek için kontrol ettiğin bir karakter/yaratık olması lazım.';
+      $('abilities-list').appendChild(p);
+      return;
+    }
+
+    $('abilities-header').textContent = sel.kind==='creature' ? 'SALDIRI YETENEKLERİ' : 'YETENEKLER';
+    renderAbilitiesList(sel, canControl(sel));
+  }
 
   function renderInventoryTab(){
     const subRow = $('inv-subtab-row');
@@ -2603,7 +2760,8 @@
     }
   }
 
-  function buildEffectSlotCard(tpl, idx){
+  function buildEffectSlotCard(tpl, idx, rerenderFn){
+    rerenderFn = rerenderFn || renderItemEditor;
     const card = document.createElement('div'); card.className = 'effect-slot-card';
     const title = document.createElement('div'); title.className='es-title'; title.textContent = 'EFEKT '+(idx+1);
     card.appendChild(title);
@@ -2620,13 +2778,13 @@
     if(tpl.effects[idx].type==='none') sel.value='none';
     sel.onchange = async () => {
       tpl.effects[idx] = { type: sel.value, params: {} };
-      renderItemEditor();
+      rerenderFn();
       await pushRemote();
     };
     card.appendChild(sel);
 
     if(tpl.effects[idx].type === 'buffDebuff'){
-      buildBuffDebuffWizard(card, tpl.effects[idx].params);
+      buildBuffDebuffWizard(card, tpl.effects[idx].params, rerenderFn);
     } else {
       const def = EFFECT_DEFS[tpl.effects[idx].type] || EFFECT_DEFS.none;
       renderParamFields(card, def.params, tpl.effects[idx].params, pushRemote);
@@ -2666,7 +2824,8 @@
   }
 
   // Buff/Debuff için adım adım soran sihirbaz: Buff mu Debuff mı? → Etkisi ne? → Hemen mi zamanla mı? → gerekli alt alanlar
-  function buildBuffDebuffWizard(card, params){
+  function buildBuffDebuffWizard(card, params, rerenderFn){
+    rerenderFn = rerenderFn || renderItemEditor;
     const lbl1 = document.createElement('label'); lbl1.className='effect-param-label'; lbl1.textContent='Buff mu, Debuff mı?';
     card.appendChild(lbl1);
     const modeSel = document.createElement('select');
@@ -2677,7 +2836,7 @@
       if(params.mode===v) o.selected=true;
       modeSel.appendChild(o);
     });
-    modeSel.onchange = async () => { params.mode = modeSel.value; renderItemEditor(); await pushRemote(); };
+    modeSel.onchange = async () => { params.mode = modeSel.value; rerenderFn(); await pushRemote(); };
     card.appendChild(modeSel);
     if(!params.mode) return;
 
@@ -2691,7 +2850,7 @@
       if(params.statType===key) o.selected=true;
       statSel.appendChild(o);
     });
-    statSel.onchange = async () => { params.statType = statSel.value; renderItemEditor(); await pushRemote(); };
+    statSel.onchange = async () => { params.statType = statSel.value; rerenderFn(); await pushRemote(); };
     card.appendChild(statSel);
     if(!params.statType) return;
 
@@ -2705,7 +2864,7 @@
       if(params.timing===v) o.selected=true;
       timingSel.appendChild(o);
     });
-    timingSel.onchange = async () => { params.timing = timingSel.value; renderItemEditor(); await pushRemote(); };
+    timingSel.onchange = async () => { params.timing = timingSel.value; rerenderFn(); await pushRemote(); };
     card.appendChild(timingSel);
     if(!params.timing) return;
 
@@ -2798,8 +2957,11 @@
     const toast = $('roll-toast');
     toast.className = 'roll-toast' + (entry.roll===20?' crit20':'') + (entry.roll===1?' crit1':'');
     $('roll-toast-big').textContent = entry.bonus ? (entry.roll+' + '+entry.bonus+' = '+entry.total) : entry.roll;
-    if(entry.combat){
-      $('roll-toast-sub').textContent = entry.charName+' → '+entry.targetName+' · '+(entry.hit ? ('İSABET, '+entry.dmg+' hasar') : 'ISKALADI');
+    if(entry.aoe){
+      $('roll-toast-sub').textContent = entry.charName + (entry.skillLabel ? (' · '+entry.skillLabel) : '') + ' · ' + (entry.hit ? ('İSABET: '+entry.targetName) : 'ISKALADI');
+    } else if(entry.combat){
+      const dmgText = (entry.dmg!=null && !isNaN(entry.dmg)) ? (entry.dmg+' hasar') : 'İSABET';
+      $('roll-toast-sub').textContent = entry.charName+' → '+entry.targetName+' · '+(entry.hit ? dmgText : 'ISKALADI');
     } else {
       $('roll-toast-sub').textContent = entry.charName + (entry.skillLabel ? (' · '+entry.skillLabel) : ' · Düz D20');
     }
@@ -2851,30 +3013,41 @@
       .filter(rc => rc[0]>=0 && rc[0]<ROWS && rc[1]>=0 && rc[1]<COLS);
 
     const elementType = SPELL_SCHOOL_ELEMENT[ability.spellSchool];
+    const terrainReactedIds = new Set();
     if(elementType){
-      const terrainKey = terrainKeyForElement(elementType);
-      if(terrainKey){
-        cells.forEach(rc => {
-          const key = rc[0]+','+rc[1];
-          const existing = session.terrain[key];
-          if(existing && existing.manual) return; // DM elle sabitlemiş, değiştirme
-          session.terrain[key] = { type: terrainKey, manual:false, createdRound: session.roundNumber };
-        });
-      }
+      cells.forEach(rc => {
+        const key = rc[0]+','+rc[1];
+        const existing = session.terrain[key];
+        const existingDef = existing && existing.type ? terrainDef(existing.type) : null;
+        const willReact = existingDef && existingDef.element && existingDef.element !== elementType;
+        if(willReact){
+          session.tokens.filter(x => (x.kind!=='creature'||x.inBattle) && x.row===rc[0] && x.col===rc[1])
+            .forEach(u => terrainReactedIds.add(u.id));
+        }
+        resolveTerrainHit(rc[0], rc[1], elementType, ability.name || 'yetenek');
+      });
     }
+
+    const effects = (ability.effects||[]).filter(e => e && e.type && e.type!=='none');
+    const hasDamageEffect = effects.some(e => e.type==='damage');
 
     let hitAny = false;
     const hitNames = [];
     cells.forEach(rc => {
       const targets = session.tokens.filter(x => (x.kind!=='creature'||x.inBattle) && x.row===rc[0] && x.col===rc[1] && x.id!==actor.id);
       targets.forEach(target => {
-        const ac = getEffectiveAC(target, isMagic);
-        const hit = total >= ac;
-        const dmg = hit ? Math.max(0, getEffectiveDamageBonus(actor, isMagic, parseInt(ability.damage)||0)) : 0;
-        if(hit){
-          applyDamageWithExecute(actor, target, dmg, isMagic);
-          applyOnHitPassives(actor, target, dmg, ability.dmgType);
-          if(elementType) applyElementEffect(target, elementType, ability.name || 'yetenek');
+        const landed = hasDamageEffect ? (total >= getEffectiveAC(target, isMagic)) : true;
+        if(landed){
+          effects.forEach(eff => {
+            if(eff.type==='damage'){
+              const dmg = Math.max(0, getEffectiveDamageBonus(actor, isMagic, rollDiceExpr(eff.params.amount)));
+              applyDamageWithExecute(actor, target, dmg, isMagic);
+              applyOnHitPassives(actor, target, dmg, ability.dmgType);
+            } else {
+              applyEffectInstance(target, eff, ability.name || 'yetenek');
+            }
+          });
+          if(elementType && !terrainReactedIds.has(target.id)) applyElementEffect(target, elementType, ability.name || 'yetenek');
           hitAny = true; hitNames.push(target.name);
         }
         checkDeath(target);
@@ -3299,6 +3472,7 @@
     wrap.innerHTML = '';
     const skillOptions = t.sheet.skills.filter(s => (s.label||'').trim());
     (t.sheet.abilities||[]).forEach((ab, i) => {
+      if(!ab.effects) ab.effects = [blankEffect(), blankEffect(), blankEffect()];
       const card = document.createElement('div');
       card.className = 'ability-card';
 
@@ -3327,13 +3501,7 @@
       rangeInp.oninput = debounce(() => { ab.range = Math.max(1, parseInt(rangeInp.value)||1); pushRemote(); }, 350);
       rangeWrap.appendChild(rangeInp);
 
-      const dmgWrap = document.createElement('div');
-      dmgWrap.innerHTML = '<label>Hasar</label>';
-      const dmgInp = document.createElement('input'); dmgInp.type='number'; dmgInp.value = ab.damage||0; dmgInp.disabled=!editable;
-      dmgInp.oninput = debounce(() => { ab.damage = parseInt(dmgInp.value)||0; pushRemote(); }, 350);
-      dmgWrap.appendChild(dmgInp);
-
-      grid.appendChild(manaWrap); grid.appendChild(rangeWrap); grid.appendChild(dmgWrap);
+      grid.appendChild(manaWrap); grid.appendChild(rangeWrap);
       card.appendChild(grid);
 
       const row2 = document.createElement('div'); row2.className = 'ability-row2';
@@ -3382,6 +3550,20 @@
       shapeSel.onchange = () => { ab.shape = shapeSel.value; pushRemote(); };
       card.appendChild(shapeSel);
 
+      const effTitle = document.createElement('h3'); effTitle.className='sheet-section-title'; effTitle.style.marginTop='14px'; effTitle.style.fontSize='11px';
+      effTitle.textContent = 'EFEKTLER';
+      card.appendChild(effTitle);
+      const effWrap = document.createElement('div');
+      function renderAbEffects(){
+        effWrap.innerHTML = '';
+        for(let k=0;k<3;k++){
+          if(!ab.effects[k]) ab.effects[k] = blankEffect();
+          effWrap.appendChild(buildEffectSlotCard(ab, k, renderAbEffects));
+        }
+      }
+      renderAbEffects();
+      card.appendChild(effWrap);
+
       if(editable){
         const rm = document.createElement('button');
         rm.className = 'ability-remove'; rm.textContent = '✕ Yeteneği Sil';
@@ -3393,10 +3575,11 @@
     $('btn-add-ability').style.display = editable ? 'block' : 'none';
   }
   $('btn-add-ability').onclick = () => {
-    const t = getSheetToken(); if(!t) return;
+    const t = session.tokens.find(x=>x.id===abilitiesCharId); if(!t) return;
     t.sheet.abilities.push({
       id:'ab'+Date.now()+Math.floor(Math.random()*999),
-      name:'', desc:'', manaCost:1, range:1, damage:1, dmgType:'fiziksel', skillLabel:'', shape:'1x1', spellSchool:'Diğer'
+      name:'', desc:'', manaCost:1, range:1, dmgType:'fiziksel', skillLabel:'', shape:'1x1', spellSchool:'Diğer',
+      effects:[blankEffect(), blankEffect(), blankEffect()]
     });
     renderAbilitiesList(t, true);
     pushRemote();
