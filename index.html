@@ -163,6 +163,33 @@
   /* character list */
   #chars-tab{ padding:14px; display:none; }
   #chars-tab.active{ display:block; }
+
+  /* NPC tab */
+  #npc-tab{ padding:14px; display:none; }
+  #npc-tab.active{ display:block; }
+  .npc-breadcrumb{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .npc-breadcrumb button{
+    font-size:12px; color:var(--gold-bright); background:rgba(201,154,63,.12); border:1px solid var(--gold);
+    padding:6px 10px; border-radius:6px; font-weight:600;
+  }
+  .npc-breadcrumb span{ font-size:13px; color:var(--text-dim); font-weight:600; letter-spacing:.03em; }
+  .npc-city-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .npc-city-card{
+    position:relative; border-radius:10px; padding:16px 10px; text-align:center; border:1px solid rgba(0,0,0,.35);
+    font-family:'Cinzel',serif; font-weight:700; font-size:14px; letter-spacing:.04em; color:#1a1220;
+    text-shadow:0 1px 0 rgba(255,255,255,.15);
+  }
+  .npc-city-card .crown{ position:absolute; top:6px; right:8px; font-size:14px; filter:drop-shadow(0 1px 1px rgba(0,0,0,.5)); }
+  .npc-city-card .crown.region{ font-size:11px; }
+  .npc-city-card .sub{ display:block; font-family:'Inter',sans-serif; font-weight:600; font-size:10px; margin-top:3px; opacity:.75; }
+  .npc-folder-row{ display:flex; flex-direction:column; gap:10px; }
+  .npc-folder-card{
+    display:flex; align-items:center; justify-content:space-between; background:var(--ink-2); border:1px solid var(--line);
+    border-radius:8px; padding:16px 14px; font-weight:600; font-size:14px;
+  }
+  .npc-folder-card .n{ font-size:11px; color:var(--text-dim); font-weight:600; }
+  .npc-card{ cursor:pointer; }
+  .npc-card .class-line{ font-size:11px; color:var(--text-dim); }
   .char-card{
     display:flex; align-items:center; gap:12px; background:var(--ink-2); border:1px solid var(--line);
     border-radius:8px; padding:10px 12px; margin-bottom:10px;
@@ -488,6 +515,17 @@
         <button class="ghost-btn" id="btn-refresh-chars" style="width:100%; margin-top:8px; display:none;">🔄 Tüm Karakterleri Yenile</button>
       </div>
 
+      <div id="npc-tab">
+        <div class="npc-breadcrumb" id="npc-breadcrumb" style="display:none;">
+          <button id="npc-back-btn">← Geri</button>
+          <span id="npc-breadcrumb-text"></span>
+        </div>
+        <div id="npc-city-grid"></div>
+        <div id="npc-folder-list"></div>
+        <div id="npc-char-list"></div>
+        <button class="add-char-btn" id="btn-add-npc" style="display:none;">+ NPC Ekle</button>
+      </div>
+
       <div id="inv-tab">
         <div class="dice-char-row" id="inv-subtab-row" style="display:none;"></div>
         <div class="dice-char-row" id="inv-char-row"></div>
@@ -518,6 +556,7 @@
     <div class="tabbar">
       <button id="tab-btn-map" class="active"><span class="ic">⚔</span>Aksiyon</button>
       <button id="tab-btn-chars"><span class="ic">🛡</span>Karakterler</button>
+      <button id="tab-btn-npc" style="display:none;"><span class="ic">🧑‍🤝‍🧑</span>NPC</button>
       <button id="tab-btn-abilities"><span class="ic">✨</span>Yetenekler</button>
       <button id="tab-btn-inv"><span class="ic">🎒</span>Envanter</button>
       <button id="tab-btn-creatures" style="display:none;"><span class="ic">🐉</span>Yaratıklar</button>
@@ -630,6 +669,23 @@
     <div class="modal-actions">
       <button class="ghost-btn" id="cr-cancel">Vazgeç</button>
       <button class="primary-btn" id="cr-save">Ekle</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD NPC MODAL -->
+<div class="modal-backdrop" id="npc-modal-backdrop">
+  <div class="modal">
+    <h3>Yeni NPC</h3>
+    <div class="field"><label>İsim</label><input id="npcm-name" type="text" maxlength="20"></div>
+    <p style="color:var(--text-dim); font-size:11px; margin:0;">Can, mana ve hız; seviyeye ve özelliklere göre kendiliğinden hesaplanacak — NPC kağıdından ayarlayabilirsin.</p>
+    <div class="field">
+      <label>Renk</label>
+      <div class="color-row" id="npcm-colors"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="ghost-btn" id="npcm-cancel">Vazgeç</button>
+      <button class="primary-btn" id="npcm-save">Ekle</button>
     </div>
   </div>
 </div>
@@ -1150,7 +1206,7 @@
     if(typeof firebase === 'undefined' || !fbDb){ setupError('Veritabanına bağlanılamadı — internet bağlantını kontrol et.'); return; }
     const code = genCode();
     me.name = name; me.code = code; me.role = 'dm'; // oda kuran kişi Zindan Ustası olur
-    const fresh = { code, tokens:[], activeTokenId:null, turnOrder:[], rollLog:[], itemTemplates:[], terrain:{}, roundNumber:1, updatedAt: Date.now() };
+    const fresh = { code, tokens:[], npcs:[], activeTokenId:null, turnOrder:[], rollLog:[], itemTemplates:[], terrain:{}, roundNumber:1, updatedAt: Date.now() };
     try{
       await fbDb.ref('sessions/'+code).set(fresh);
       session = fresh;
@@ -1197,6 +1253,7 @@
     $('btn-import').style.display = me.role === 'dm' ? 'inline-block' : 'none';
     $('tab-btn-creatures').style.display = me.role === 'dm' ? 'flex' : 'none';
     $('tab-btn-items').style.display = me.role === 'dm' ? 'flex' : 'none';
+    $('tab-btn-npc').style.display = me.role === 'dm' ? 'flex' : 'none';
 
     $('grid').style.width = (COLS*CELL)+'px';
     $('grid').style.height = (ROWS*CELL)+'px';
@@ -1248,6 +1305,7 @@
   // ---------- Tabs ----------
   $('tab-btn-map').onclick = () => switchTab('map');
   $('tab-btn-chars').onclick = () => switchTab('chars');
+  $('tab-btn-npc').onclick = () => switchTab('npc');
   $('tab-btn-abilities').onclick = () => switchTab('abilities');
   $('tab-btn-inv').onclick = () => switchTab('inv');
   $('tab-btn-creatures').onclick = () => switchTab('creatures');
@@ -1255,17 +1313,20 @@
   function switchTab(t){
     $('map-tab').classList.toggle('active', t==='map');
     $('chars-tab').classList.toggle('active', t==='chars');
+    $('npc-tab').classList.toggle('active', t==='npc');
     $('abilities-tab').classList.toggle('active', t==='abilities');
     $('inv-tab').classList.toggle('active', t==='inv');
     $('creatures-tab').classList.toggle('active', t==='creatures');
     $('items-tab').classList.toggle('active', t==='items');
     $('tab-btn-map').classList.toggle('active', t==='map');
     $('tab-btn-chars').classList.toggle('active', t==='chars');
+    $('tab-btn-npc').classList.toggle('active', t==='npc');
     $('tab-btn-abilities').classList.toggle('active', t==='abilities');
     $('tab-btn-inv').classList.toggle('active', t==='inv');
     $('tab-btn-creatures').classList.toggle('active', t==='creatures');
     $('tab-btn-items').classList.toggle('active', t==='items');
     if(t==='map') renderDicePanel();
+    if(t==='npc') renderNpcTab();
     if(t==='abilities') renderAbilitiesTab();
     if(t==='inv') renderInventoryTab();
     if(t==='creatures') renderCreatureList();
@@ -1378,6 +1439,8 @@
   // ---------- Render ----------
   function renderAll(){
     session.tokens.forEach(ensureTokenDefaults);
+    if(!session.npcs) session.npcs = [];
+    session.npcs.forEach(ensureTokenDefaults);
     if(!session.rollLog) session.rollLog = [];
     if(!session.turnOrder) session.turnOrder = [];
     if(!session.itemTemplates) session.itemTemplates = [];
@@ -1393,6 +1456,7 @@
     if($('creatures-tab').classList.contains('active')) renderCreatureList();
     if($('items-tab').classList.contains('active')) renderItemTemplateList();
     if($('abilities-tab').classList.contains('active')) renderAbilitiesTab();
+    if($('npc-tab').classList.contains('active')) renderNpcTab();
     flushFloatingNumbers();
   }
 
@@ -2552,8 +2616,181 @@
     renderAll();
   };
 
+  // ---------- NPC tab ----------
+  const NPC_CITIES = [
+    {id:'thalorin', name:'THALORIN', color:'#8a6fae'},
+    {id:'lunanda',  name:'LUNANDA',  color:'#8a6fae'},
+    {id:'sarezhar', name:'SAREZHAR', color:'#8a6fae', crown:'capital'},
+    {id:'esilen',   name:'ESILEN',   color:'#8a6fae'},
+    {id:'orgstan',  name:'ORGSTAN',  color:'#c2a668'},
+    {id:'moria',    name:'MORIA',    color:'#c2a668'},
+    {id:'sparta',   name:'SPARTA',   color:'#c2a668'},
+    {id:'baldur',   name:'BALDUR',   color:'#c2a668', crown:'region'},
+    {id:'sham',     name:'SHAM',     color:'#4f6b3a'},
+    {id:'zumer',    name:'ZUMER',    color:'#4f6b3a'},
+    {id:'akad',     name:'AKAD',     color:'#4f6b3a'},
+    {id:'bagdat',   name:'BAGDAT',   color:'#4f6b3a', crown:'region'}
+  ];
+  const NPC_FOLDERS = [
+    {id:'tuccar', label:'🛒 Tüccarlar'},
+    {id:'diger',  label:'📜 Diğer'}
+  ];
+
+  let npcView = 'cities'; // 'cities' | 'folders' | 'list'
+  let npcCityId = null;
+  let npcFolderId = null;
+  let mnpcColor = COLORS[0];
+
+  function renderNpcTab(){
+    $('npc-city-grid').style.display = npcView==='cities' ? 'grid' : 'none';
+    $('npc-city-grid').className = 'npc-city-grid';
+    $('npc-folder-list').style.display = npcView==='folders' ? 'flex' : 'none';
+    $('npc-folder-list').className = 'npc-folder-row';
+    $('npc-char-list').style.display = npcView==='list' ? 'block' : 'none';
+    $('btn-add-npc').style.display = (npcView==='list' && me.role==='dm') ? 'block' : 'none';
+
+    const crumb = $('npc-breadcrumb');
+    if(npcView==='cities'){
+      crumb.style.display = 'none';
+    } else {
+      crumb.style.display = 'flex';
+      const city = NPC_CITIES.find(c=>c.id===npcCityId);
+      const folder = NPC_FOLDERS.find(f=>f.id===npcFolderId);
+      $('npc-breadcrumb-text').textContent = npcView==='folders'
+        ? (city ? city.name : '')
+        : (city ? city.name + ' / ' + (folder?folder.label:'') : '');
+    }
+
+    if(npcView==='cities') renderNpcCityGrid();
+    else if(npcView==='folders') renderNpcFolders();
+    else renderNpcCharList();
+  }
+
+  $('npc-back-btn').onclick = () => {
+    if(npcView==='list'){ npcView='folders'; npcFolderId=null; }
+    else if(npcView==='folders'){ npcView='cities'; npcCityId=null; }
+    renderNpcTab();
+  };
+
+  function renderNpcCityGrid(){
+    const wrap = $('npc-city-grid');
+    wrap.innerHTML = '';
+    NPC_CITIES.forEach(city => {
+      const card = document.createElement('div');
+      card.className = 'npc-city-card';
+      card.style.background = city.color;
+      card.onclick = () => { npcCityId = city.id; npcView = 'folders'; renderNpcTab(); };
+      if(city.crown === 'capital'){
+        const c = document.createElement('span'); c.className='crown'; c.textContent='👑'; card.appendChild(c);
+      } else if(city.crown === 'region'){
+        const c = document.createElement('span'); c.className='crown region'; c.textContent='👑'; card.appendChild(c);
+      }
+      const nm = document.createElement('span'); nm.textContent = city.name;
+      card.appendChild(nm);
+      if(city.crown === 'capital'){
+        const sub = document.createElement('span'); sub.className='sub'; sub.textContent='Başkent'; card.appendChild(sub);
+      } else if(city.crown === 'region'){
+        const sub = document.createElement('span'); sub.className='sub'; sub.textContent='Bölge Büyüğü'; card.appendChild(sub);
+      }
+      wrap.appendChild(card);
+    });
+  }
+
+  function renderNpcFolders(){
+    const wrap = $('npc-folder-list');
+    wrap.innerHTML = '';
+    NPC_FOLDERS.forEach(f => {
+      const count = session.npcs.filter(n => n.cityId===npcCityId && n.category===f.id).length;
+      const card = document.createElement('div');
+      card.className = 'npc-folder-card';
+      card.onclick = () => { npcFolderId = f.id; npcView = 'list'; renderNpcTab(); };
+      const lbl = document.createElement('span'); lbl.textContent = f.label;
+      const n = document.createElement('span'); n.className='n'; n.textContent = count + ' NPC';
+      card.appendChild(lbl); card.appendChild(n);
+      wrap.appendChild(card);
+    });
+  }
+
+  function renderNpcCharList(){
+    const wrap = $('npc-char-list');
+    wrap.innerHTML = '';
+    const list = session.npcs.filter(n => n.cityId===npcCityId && n.category===npcFolderId);
+    if(list.length === 0){
+      const p = document.createElement('p');
+      p.style.color = 'var(--text-dim)'; p.style.fontSize='13px'; p.style.textAlign='center';
+      p.textContent = 'Bu klasörde henüz NPC yok.';
+      wrap.appendChild(p);
+    }
+    list.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'char-card npc-card';
+      card.onclick = () => openSheet(t.id);
+
+      const av = document.createElement('div');
+      av.className = 'char-avatar'; applyAvatar(av, t);
+
+      const info = document.createElement('div');
+      info.className = 'char-info';
+      const nameRow = document.createElement('div');
+      nameRow.className = 'name';
+      nameRow.textContent = t.name;
+      const classLine = document.createElement('div');
+      classLine.className = 'class-line';
+      classLine.textContent = (t.sheet && t.sheet.className) ? t.sheet.className : 'Sınıf belirtilmemiş';
+      info.appendChild(nameRow); info.appendChild(classLine);
+      renderStatusBadges(t, info);
+
+      card.appendChild(av); card.appendChild(info);
+
+      const rm = document.createElement('button');
+      rm.className='rm-btn'; rm.textContent='✕';
+      rm.onclick = (ev) => { ev.stopPropagation(); removeNpc(t.id); };
+      card.appendChild(rm);
+
+      wrap.appendChild(card);
+    });
+  }
+
+  async function removeNpc(id){
+    session.npcs = session.npcs.filter(n => n.id !== id);
+    await pushRemote();
+    renderNpcTab();
+  }
+
+  $('btn-add-npc').onclick = () => openNpcModal();
+  function openNpcModal(){
+    $('npcm-name').value='';
+    const row = $('npcm-colors'); row.innerHTML='';
+    mnpcColor = COLORS[session.npcs.length % COLORS.length];
+    COLORS.forEach(c => {
+      const sw = document.createElement('div');
+      sw.className='color-swatch' + (c===mnpcColor?' sel':'');
+      sw.style.background=c;
+      sw.onclick = () => { mnpcColor=c; row.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('sel')); sw.classList.add('sel'); };
+      row.appendChild(sw);
+    });
+    $('npc-modal-backdrop').classList.add('open');
+  }
+  $('npcm-cancel').onclick = () => $('npc-modal-backdrop').classList.remove('open');
+  $('npcm-save').onclick = async () => {
+    const name = $('npcm-name').value.trim();
+    if(!name) return;
+    const newNpc = {
+      id: 'npc'+Date.now()+Math.floor(Math.random()*999),
+      name, color: mnpcColor, owner: null, kind:'npc',
+      cityId: npcCityId, category: npcFolderId,
+      sheet: defaultSheet(), hp:1, mp:1
+    };
+    newNpc.hp = getMaxHp(newNpc);
+    newNpc.mp = getMaxMp(newNpc);
+    session.npcs.push(newNpc);
+    await pushRemote();
+    $('npc-modal-backdrop').classList.remove('open');
+    renderNpcTab();
+  };
+
   // ---------- Character sheet ----------
-  function getSheetToken(){ return session.tokens.find(t => t.id === currentSheetTokenId); }
+  function getSheetToken(){ return session.tokens.find(t => t.id === currentSheetTokenId) || (session.npcs||[]).find(t => t.id === currentSheetTokenId); }
 
   $('sheet-revive-btn').onclick = async () => {
     if(me.role !== 'dm') return;
@@ -2580,13 +2817,14 @@
     currentSheetTokenId = null;
     renderCharList();
     renderGrid();
+    if($('npc-tab').classList.contains('active')) renderNpcTab();
     applyPendingRemote(); // sheet açıkken ertelenen senkronizasyonu şimdi uygula
   };
 
   function renderSheet(t){
     const editable = canControl(t);
     const isCreature = t.kind === 'creature';
-    $('sheet-revive-btn').style.display = (me.role==='dm' && !isCreature && t.hp<=0) ? 'block' : 'none';
+    $('sheet-revive-btn').style.display = (me.role==='dm' && !isCreature && t.kind!=='npc' && t.hp<=0) ? 'block' : 'none';
     $('sheet-name').value = t.name;
     $('sheet-class').value = t.sheet.className || '';
     $('sheet-level').value = t.sheet.level || 1;
