@@ -403,59 +403,6 @@
   .item-tpl-card .tpl-name{ font-size:13px; font-weight:600; }
   .item-tpl-card .tpl-meta{ font-size:10.5px; color:var(--text-dim); margin-top:2px; }
   .item-quality-badge{ font-size:10px; padding:2px 7px; border-radius:8px; font-weight:700; }
-
-  /* ============ MASAÜSTÜ (DESKTOP) MODU ============
-     Bu kurallar bir @media sorgusuyla değil, body.desktop-mode sınıfıyla tetikleniyor;
-     böylece hem ekran genişliğine göre otomatik, hem de kullanıcı elle seçtiğinde çalışır. */
-  .view-toggle-btn{
-    background:transparent; color:var(--text-dim); font-size:11px; border:1px solid var(--line);
-    border-radius:6px; padding:5px 9px; display:flex; align-items:center; gap:5px;
-  }
-  .view-toggle-btn:active{ background:var(--ink-3); }
-
-  body.desktop-mode{ align-items:flex-start; padding-top:0; }
-  body.desktop-mode #app{ max-width:1280px; }
-  body.desktop-mode #main-screen{ display:flex; flex-direction:column; }
-  body.desktop-mode .tabbar{
-    position:static; order:-1; max-width:100%; transform:none; left:auto; bottom:auto;
-    border-top:none; border-bottom:1px solid var(--line); justify-content:center; gap:4px; padding:0 12px;
-  }
-  body.desktop-mode .tabbar button{ flex:0 0 auto; min-width:110px; padding:14px 10px; }
-  body.desktop-mode .content{ padding-bottom:24px; }
-  body.desktop-mode .setup-wrap{ max-width:420px; margin:0 auto; }
-
-  body.desktop-mode #map-tab.active{ display:flex; gap:24px; align-items:flex-start; }
-  body.desktop-mode .map-main-col{ flex:1; min-width:0; }
-  body.desktop-mode .map-side-col{ width:360px; flex-shrink:0; position:sticky; top:14px; }
-  body.desktop-mode .map-scroll{ max-width:100%; }
-
-  body.desktop-mode #chars-tab, body.desktop-mode #inv-tab, body.desktop-mode #creatures-tab,
-  body.desktop-mode #items-tab, body.desktop-mode #abilities-tab{
-    max-width:820px; margin:0 auto; width:100%;
-  }
-  body.desktop-mode #char-list, body.desktop-mode #creature-list, body.desktop-mode #item-template-list{
-    display:grid; grid-template-columns:1fr 1fr; gap:12px;
-  }
-  body.desktop-mode .char-card, body.desktop-mode .item-tpl-card{ margin-bottom:0; }
-
-  body.desktop-mode .modal-backdrop{ align-items:center; }
-  body.desktop-mode .modal{
-    max-width:520px; border-radius:16px; border-top:1px solid var(--line);
-  }
-  body.desktop-mode .sheet-overlay{
-    inset:auto; right:auto; bottom:auto;
-    max-width:640px; left:50%; top:5vh; height:90vh;
-    transform:translate(-50%,40px); opacity:0; pointer-events:none;
-    transition:transform .22s ease, opacity .22s ease;
-    border-radius:16px; border:1px solid var(--line); box-shadow:0 30px 80px rgba(0,0,0,.6);
-  }
-  body.desktop-mode .sheet-overlay.open{
-    transform:translate(-50%,0); opacity:1; pointer-events:auto;
-  }
-  body.desktop-mode:has(.sheet-overlay.open)::before{
-    content:''; position:fixed; inset:0; background:rgba(10,8,14,.7); z-index:29;
-  }
-  body.desktop-mode .sheet-top{ align-items:flex-start; }
 </style>
 </head>
 <body>
@@ -501,7 +448,6 @@
         <div class="role-pill" id="hdr-role"></div>
       </div>
       <div class="topbar-actions">
-        <button class="view-toggle-btn" id="btn-view-toggle">🖥️ Otomatik</button>
         <button class="leave" id="btn-export" style="display:none;">Yedek Al</button>
         <button class="leave" id="btn-import" style="display:none;">Yedek Yükle</button>
         <input type="file" id="import-input" accept="application/json" style="display:none;">
@@ -513,28 +459,24 @@
 
     <div class="content">
       <div id="map-tab" class="active">
-        <div class="map-main-col">
-          <div class="mode-banner" id="mode-banner">
-            <span id="mode-banner-text"></span>
-            <button id="mode-cancel">Vazgeç</button>
-          </div>
-          <div class="map-scroll">
-            <div id="grid"></div>
-          </div>
-          <div class="map-hint" id="map-hint">Bir karaktere dokun, ne yapmak istediğini seç.</div>
-          <button class="ghost-btn" id="btn-paint-terrain" style="width:100%; display:none;">🗺 Zemin Boya</button>
-          <button class="ghost-btn" id="btn-lock-terrain" style="width:100%; display:none; margin-top:8px;">🔒 Zemin Kilitle / Aç</button>
+        <div class="mode-banner" id="mode-banner">
+          <span id="mode-banner-text"></span>
+          <button id="mode-cancel">Vazgeç</button>
+        </div>
+        <div class="map-scroll">
+          <div id="grid"></div>
+        </div>
+        <div class="map-hint" id="map-hint">Bir karaktere dokun, ne yapmak istediğini seç.</div>
+        <button class="ghost-btn" id="btn-paint-terrain" style="width:100%; display:none;">🗺 Zemin Boya</button>
+        <button class="ghost-btn" id="btn-lock-terrain" style="width:100%; display:none; margin-top:8px;">🔒 Zemin Kilitle / Aç</button>
+
+        <div class="dice-panel">
+          <h3 class="sheet-section-title">ZAR AT</h3>
+          <div class="dice-char-row" id="dice-char-row"></div>
+          <div id="dice-roll-area"></div>
         </div>
 
-        <div class="map-side-col">
-          <div class="dice-panel">
-            <h3 class="sheet-section-title">ZAR AT</h3>
-            <div class="dice-char-row" id="dice-char-row"></div>
-            <div id="dice-roll-area"></div>
-          </div>
-
-          <button class="primary-btn" id="btn-end-turn" style="width:100%; margin-top:16px; display:none;">Turu Bitir</button>
-        </div>
+        <button class="primary-btn" id="btn-end-turn" style="width:100%; margin-top:16px; display:none;">Turu Bitir</button>
       </div>
 
       <div id="chars-tab">
@@ -798,13 +740,7 @@
 (function(){
   const COLORS = ['#c1440e','#c99a3f','#5a7fa6','#6f8f5a','#9a5aa6','#a65a5a','#5aa69f','#8a8a8a'];
   const COLS = 10, ROWS = 8;
-  function computeCellSize(){
-    const isDesktop = document.body.classList.contains('desktop-mode');
-    const maxCell = isDesktop ? 860 : 520;
-    const avail = isDesktop ? Math.min(window.innerWidth - 420, 900) : (window.innerWidth - 60);
-    return Math.floor(Math.min(avail, maxCell) / COLS);
-  }
-  let CELL = computeCellSize();
+  const CELL = Math.floor(Math.min(window.innerWidth - 60, 520) / COLS);
   const DEFAULT_SKILLS = [
     ['AKADEMİ','BLG'], ['PAZARLIK','HNR'], ['ÇEVİKLİK','FZK'], ['SİMYA','BLG'],
     ['GİZLİLİK','HNR'], ['KONTAKLAR','BLG'], ['ÜRETİM','BLG'], ['EMPATİ','HNR'],
@@ -1160,32 +1096,6 @@
 
   let me = { name:'', role:'player', code:'' };
   let session = null; // shared state
-
-  // ---------- Görünüm modu (masaüstü/telefon, elle veya otomatik) ----------
-  let viewMode = 'auto'; // 'auto' | 'desktop' | 'mobile'
-  function applyViewMode(){
-    let isDesktop;
-    if(viewMode==='desktop') isDesktop = true;
-    else if(viewMode==='mobile') isDesktop = false;
-    else isDesktop = window.innerWidth >= 1024;
-    document.body.classList.toggle('desktop-mode', isDesktop);
-    const btn = document.getElementById('btn-view-toggle');
-    if(btn){
-      btn.textContent = viewMode==='auto' ? ('🖥️ Otomatik ('+(isDesktop?'Masaüstü':'Telefon')+')')
-        : viewMode==='desktop' ? '🖥️ Masaüstü' : '📱 Telefon';
-    }
-    const newCell = computeCellSize();
-    if(newCell !== CELL){
-      CELL = newCell;
-      if(session) renderAll();
-    }
-  }
-  window.addEventListener('resize', debounce(() => applyViewMode(), 200));
-  applyViewMode();
-  document.getElementById('btn-view-toggle').onclick = () => {
-    viewMode = viewMode==='auto' ? 'desktop' : viewMode==='desktop' ? 'mobile' : 'auto';
-    applyViewMode();
-  };
 
   let actingTokenId = null;  // aksiyon menüsünü açan / hedef seçimi bekleyen karakter
   let actionMode = null;     // null | 'walk' | 'melee' | 'ability' | 'item' | 'terrain'
