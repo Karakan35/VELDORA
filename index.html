@@ -403,6 +403,51 @@
   .item-tpl-card .tpl-name{ font-size:13px; font-weight:600; }
   .item-tpl-card .tpl-meta{ font-size:10.5px; color:var(--text-dim); margin-top:2px; }
   .item-quality-badge{ font-size:10px; padding:2px 7px; border-radius:8px; font-weight:700; }
+
+  /* ============ MASAÜSTÜ (DESKTOP) MODU ============
+     Bu kurallar bir @media sorgusuyla değil, body.desktop-mode sınıfıyla tetikleniyor;
+     böylece hem ekran genişliğine göre otomatik, hem de kullanıcı elle seçtiğinde çalışır. */
+  .view-toggle-btn{
+    background:transparent; color:var(--text-dim); font-size:11px; border:1px solid var(--line);
+    border-radius:6px; padding:5px 9px; display:flex; align-items:center; gap:5px;
+  }
+  .view-toggle-btn:active{ background:var(--ink-3); }
+
+  body.desktop-mode{ align-items:flex-start; padding-top:0; }
+  body.desktop-mode #app{ max-width:1280px; }
+  body.desktop-mode #main-screen{ display:flex; flex-direction:column; }
+  body.desktop-mode .tabbar{
+    position:static; order:-1; max-width:100%; transform:none; left:auto; bottom:auto;
+    border-top:none; border-bottom:1px solid var(--line); justify-content:center; gap:4px; padding:0 12px;
+  }
+  body.desktop-mode .tabbar button{ flex:0 0 auto; min-width:110px; padding:14px 10px; }
+  body.desktop-mode .content{ padding-bottom:24px; }
+  body.desktop-mode .setup-wrap{ max-width:420px; margin:0 auto; }
+
+  body.desktop-mode #map-tab.active{ display:flex; gap:24px; align-items:flex-start; }
+  body.desktop-mode .map-main-col{ flex:1; min-width:0; }
+  body.desktop-mode .map-side-col{ width:360px; flex-shrink:0; position:sticky; top:14px; }
+  body.desktop-mode .map-scroll{ max-width:100%; }
+
+  body.desktop-mode #chars-tab, body.desktop-mode #inv-tab, body.desktop-mode #creatures-tab,
+  body.desktop-mode #items-tab, body.desktop-mode #abilities-tab{
+    max-width:820px; margin:0 auto; width:100%;
+  }
+  body.desktop-mode #char-list, body.desktop-mode #creature-list, body.desktop-mode #item-template-list{
+    display:grid; grid-template-columns:1fr 1fr; gap:12px;
+  }
+  body.desktop-mode .char-card, body.desktop-mode .item-tpl-card{ margin-bottom:0; }
+
+  body.desktop-mode .modal-backdrop{ align-items:center; }
+  body.desktop-mode .modal{
+    max-width:520px; border-radius:16px; border-top:1px solid var(--line);
+  }
+  body.desktop-mode .sheet-overlay{
+    max-width:640px; left:50%; top:5vh; height:90vh; transform:translate(-50%,20px);
+    border-radius:16px; border:1px solid var(--line); box-shadow:0 30px 80px rgba(0,0,0,.6);
+  }
+  body.desktop-mode .sheet-overlay.open{ transform:translate(-50%,0); }
+  body.desktop-mode .sheet-top{ align-items:flex-start; }
 </style>
 </head>
 <body>
@@ -448,6 +493,7 @@
         <div class="role-pill" id="hdr-role"></div>
       </div>
       <div class="topbar-actions">
+        <button class="view-toggle-btn" id="btn-view-toggle">🖥️ Otomatik</button>
         <button class="leave" id="btn-export" style="display:none;">Yedek Al</button>
         <button class="leave" id="btn-import" style="display:none;">Yedek Yükle</button>
         <input type="file" id="import-input" accept="application/json" style="display:none;">
@@ -459,24 +505,28 @@
 
     <div class="content">
       <div id="map-tab" class="active">
-        <div class="mode-banner" id="mode-banner">
-          <span id="mode-banner-text"></span>
-          <button id="mode-cancel">Vazgeç</button>
-        </div>
-        <div class="map-scroll">
-          <div id="grid"></div>
-        </div>
-        <div class="map-hint" id="map-hint">Bir karaktere dokun, ne yapmak istediğini seç.</div>
-        <button class="ghost-btn" id="btn-paint-terrain" style="width:100%; display:none;">🗺 Zemin Boya</button>
-        <button class="ghost-btn" id="btn-lock-terrain" style="width:100%; display:none; margin-top:8px;">🔒 Zemin Kilitle / Aç</button>
-
-        <div class="dice-panel">
-          <h3 class="sheet-section-title">ZAR AT</h3>
-          <div class="dice-char-row" id="dice-char-row"></div>
-          <div id="dice-roll-area"></div>
+        <div class="map-main-col">
+          <div class="mode-banner" id="mode-banner">
+            <span id="mode-banner-text"></span>
+            <button id="mode-cancel">Vazgeç</button>
+          </div>
+          <div class="map-scroll">
+            <div id="grid"></div>
+          </div>
+          <div class="map-hint" id="map-hint">Bir karaktere dokun, ne yapmak istediğini seç.</div>
+          <button class="ghost-btn" id="btn-paint-terrain" style="width:100%; display:none;">🗺 Zemin Boya</button>
+          <button class="ghost-btn" id="btn-lock-terrain" style="width:100%; display:none; margin-top:8px;">🔒 Zemin Kilitle / Aç</button>
         </div>
 
-        <button class="primary-btn" id="btn-end-turn" style="width:100%; margin-top:16px; display:none;">Turu Bitir</button>
+        <div class="map-side-col">
+          <div class="dice-panel">
+            <h3 class="sheet-section-title">ZAR AT</h3>
+            <div class="dice-char-row" id="dice-char-row"></div>
+            <div id="dice-roll-area"></div>
+          </div>
+
+          <button class="primary-btn" id="btn-end-turn" style="width:100%; margin-top:16px; display:none;">Turu Bitir</button>
+        </div>
       </div>
 
       <div id="chars-tab">
@@ -544,10 +594,12 @@
 <div class="modal-backdrop" id="action-menu-backdrop">
   <div class="modal">
     <h3 id="action-menu-title">Aksiyon</h3>
+    <div class="quality-row" id="am-resource-row"></div>
     <button class="action-menu-btn" id="am-walk">🚶 Yürü</button>
     <button class="action-menu-btn" id="am-melee">⚔ Düz Vur</button>
     <button class="action-menu-btn" id="am-ability">✨ Yetenek Kullan</button>
-    <button class="action-menu-btn" id="am-item">🎒 Eşya Kullan</button>
+    <button class="action-menu-btn" id="am-item">🎒 Eşya Kullan (Bonus)</button>
+    <button class="ghost-btn" id="am-reset" style="display:none; color:var(--gold-bright);">🔄 Puanları Sıfırla (DM)</button>
     <button class="ghost-btn" id="am-cancel">Vazgeç</button>
   </div>
 </div>
@@ -558,6 +610,18 @@
     <h3 id="picker-title">Seç</h3>
     <div id="picker-list"></div>
     <button class="ghost-btn" id="picker-cancel">Vazgeç</button>
+  </div>
+</div>
+
+<!-- LIBRARY BROWSER (filtreli kütüphaneden ekle) -->
+<div class="modal-backdrop" id="library-picker-backdrop">
+  <div class="modal">
+    <h3>Kütüphaneden Eşya Seç</h3>
+    <div class="field"><label>Tür</label><div class="quality-row" id="lib-type-filter"></div></div>
+    <div class="field" id="lib-slot-filter-wrap" style="display:none;"><label>Ekipman Yeri</label><div class="quality-row" id="lib-slot-filter"></div></div>
+    <div class="field"><label>Kalite</label><div class="quality-row" id="lib-quality-filter"></div></div>
+    <div id="lib-item-list"></div>
+    <button class="ghost-btn" id="lib-picker-close">Kapat</button>
   </div>
 </div>
 
@@ -726,7 +790,13 @@
 (function(){
   const COLORS = ['#c1440e','#c99a3f','#5a7fa6','#6f8f5a','#9a5aa6','#a65a5a','#5aa69f','#8a8a8a'];
   const COLS = 10, ROWS = 8;
-  const CELL = Math.floor(Math.min(window.innerWidth - 60, 520) / COLS);
+  function computeCellSize(){
+    const isDesktop = document.body.classList.contains('desktop-mode');
+    const maxCell = isDesktop ? 860 : 520;
+    const avail = isDesktop ? Math.min(window.innerWidth - 420, 900) : (window.innerWidth - 60);
+    return Math.floor(Math.min(avail, maxCell) / COLS);
+  }
+  let CELL = computeCellSize();
   const DEFAULT_SKILLS = [
     ['AKADEMİ','BLG'], ['PAZARLIK','HNR'], ['ÇEVİKLİK','FZK'], ['SİMYA','BLG'],
     ['GİZLİLİK','HNR'], ['KONTAKLAR','BLG'], ['ÜRETİM','BLG'], ['EMPATİ','HNR'],
@@ -1082,6 +1152,33 @@
 
   let me = { name:'', role:'player', code:'' };
   let session = null; // shared state
+
+  // ---------- Görünüm modu (masaüstü/telefon, elle veya otomatik) ----------
+  let viewMode = 'auto'; // 'auto' | 'desktop' | 'mobile'
+  function applyViewMode(){
+    let isDesktop;
+    if(viewMode==='desktop') isDesktop = true;
+    else if(viewMode==='mobile') isDesktop = false;
+    else isDesktop = window.innerWidth >= 1024;
+    document.body.classList.toggle('desktop-mode', isDesktop);
+    const btn = document.getElementById('btn-view-toggle');
+    if(btn){
+      btn.textContent = viewMode==='auto' ? ('🖥️ Otomatik ('+(isDesktop?'Masaüstü':'Telefon')+')')
+        : viewMode==='desktop' ? '🖥️ Masaüstü' : '📱 Telefon';
+    }
+    const newCell = computeCellSize();
+    if(newCell !== CELL){
+      CELL = newCell;
+      if(session) renderAll();
+    }
+  }
+  window.addEventListener('resize', debounce(() => applyViewMode(), 200));
+  applyViewMode();
+  document.getElementById('btn-view-toggle').onclick = () => {
+    viewMode = viewMode==='auto' ? 'desktop' : viewMode==='desktop' ? 'mobile' : 'auto';
+    applyViewMode();
+  };
+
   let actingTokenId = null;  // aksiyon menüsünü açan / hedef seçimi bekleyen karakter
   let actionMode = null;     // null | 'walk' | 'melee' | 'ability' | 'item' | 'terrain'
   let pendingAbility = null; // actionMode === 'ability' iken seçilen yetenek
@@ -1315,6 +1412,7 @@
     if(!t.equipment) t.equipment = {};
     if(!t.statusEffects) t.statusEffects = [];
     if(t.elementState === undefined) t.elementState = null;
+    if(!t.turnResources) t.turnResources = { action:true, bonus:true, move:true };
     if(!t.kind) t.kind = 'character';
     if(t.inBattle == null) t.inBattle = (t.kind === 'character');
     if(t.hp == null) t.hp = getMaxHp(t);
@@ -1442,6 +1540,37 @@
     });
   }
 
+  async function advanceTurnInternal(){
+    const activeIds = (session.turnOrder||[]).filter(id => {
+      const t = session.tokens.find(x=>x.id===id);
+      return t && (t.kind!=='creature' || t.inBattle);
+    });
+    if(activeIds.length === 0) return;
+    const active = session.tokens.find(t=>t.id===session.activeTokenId);
+    if(active) await tickStatusEffects(active); // turu biten karakterin üzerindeki etkiler şimdi işler
+    const curIdx = activeIds.indexOf(session.activeTokenId);
+    const nextIdx = (curIdx+1) % activeIds.length;
+    if(nextIdx <= curIdx || curIdx===-1){
+      session.roundNumber = (session.roundNumber||1) + 1;
+      decayTerrain();
+    }
+    session.activeTokenId = activeIds[nextIdx];
+    const newActive = session.tokens.find(t=>t.id===session.activeTokenId);
+    if(newActive) newActive.turnResources = { action:true, bonus:true, move:true };
+  }
+
+  // Sırası gelen birim sersemlemiş (stun) durumdaysa turunu otomatik atlar, etkileri yine de işler.
+  async function autoSkipStunned(){
+    let guard = 0;
+    while(guard < 50){
+      const active = session.tokens.find(t=>t.id===session.activeTokenId);
+      if(!active || !hasBlockingStun(active)) break;
+      logSystemEvent(active.name + ' sersemlemiş durumda, turu otomatik atlandı.');
+      await advanceTurnInternal();
+      guard++;
+    }
+  }
+
   async function resetTurnOrder(){
     if(me.role !== 'dm') return;
     const participants = session.tokens.filter(t => t.kind!=='creature' || t.inBattle);
@@ -1449,6 +1578,9 @@
     session.turnOrder = sorted.map(t=>t.id);
     session.activeTokenId = session.turnOrder[0] || null;
     session.roundNumber = 1;
+    const firstActive = session.tokens.find(t=>t.id===session.activeTokenId);
+    if(firstActive) firstActive.turnResources = { action:true, bonus:true, move:true };
+    await autoSkipStunned();
     await pushRemote();
     renderAll();
   }
@@ -1461,14 +1593,8 @@
     if(activeIds.length === 0) return;
     const active = session.tokens.find(t=>t.id===session.activeTokenId);
     if(!(me.role==='dm' || (active && active.owner===me.name))) return;
-    if(active) await tickStatusEffects(active); // turu biten karakterin üzerindeki etkiler şimdi işler
-    const curIdx = activeIds.indexOf(session.activeTokenId);
-    const nextIdx = (curIdx+1) % activeIds.length;
-    if(nextIdx <= curIdx || curIdx===-1){
-      session.roundNumber = (session.roundNumber||1) + 1;
-      decayTerrain();
-    }
-    session.activeTokenId = activeIds[nextIdx];
+    await advanceTurnInternal();
+    await autoSkipStunned();
     await pushRemote();
     renderAll();
   }
@@ -1478,18 +1604,9 @@
     return def ? def.key : null;
   }
 
-  // İki farklı element zemin üzerinde çarpıştığında zemin ne olur (null = zemin temizlenir, undefined = eşleşme yok/normal boyama)
-  const TERRAIN_REACTION_OUTCOME = {
-    'islak+yanma':    null,      // buharlaşma: zemin temizlenir
-    'islak+elektrik': 'islak',   // şok sönümlenir, su kalır
-    'islak+soguk':    'buzlu',   // donar, buz zemin olur
-    'yanma+soguk':    'islak',   // erir, su olur
-    'yanma+elektrik': null,      // patlama: zemin temizlenir
-    'elektrik+soguk': null       // nötrlenir: zemin temizlenir
-  };
-
   // Bir hücreye elementel bir etki (büyü/yetenek) geldiğinde zeminin de birimler gibi tepki vermesini sağlar.
   // Kilitli zeminler asla değişmez ama üzerindeki birimler yine de reaksiyondan etkilenir (ör. göl her zaman sudur).
+  // Kilitli olmayan bir zemine farklı bir element geldiğinde zemin her zaman o yeni elemente döner.
   function resolveTerrainHit(row, col, incomingElement, sourceLabel){
     const key = row+','+col;
     const incomingTerrainKey = terrainKeyForElement(incomingElement);
@@ -1503,33 +1620,18 @@
     const existingDef = terrainDef(existing.type);
     const existingElement = existingDef ? existingDef.element : null;
 
-    if(!existingElement || existingElement === incomingElement){
-      if(!existing.locked){
-        session.terrain[key] = { type: incomingTerrainKey, manual:existing.manual, locked:existing.locked, createdRound: session.roundNumber };
-      }
-      return;
+    if(existingElement && existingElement !== incomingElement){
+      // farklı element: önce üstündeki birimlere reaksiyonu uygula
+      const unitsHere = session.tokens.filter(x => (x.kind!=='creature'||x.inBattle) && x.row===row && x.col===col);
+      unitsHere.forEach(u => resolveElementReaction(u, incomingElement, sourceLabel));
     }
-
-    // farklı element: önce üstündeki birimlere reaksiyonu uygula
-    const unitsHere = session.tokens.filter(x => (x.kind!=='creature'||x.inBattle) && x.row===row && x.col===col);
-    unitsHere.forEach(u => resolveElementReaction(u, incomingElement, sourceLabel));
 
     if(existing.locked){
       logSystemEvent((terrainDef(existing.type)||{}).label + ' zemini kilitli, değişmedi.');
       return; // kilitli zemin değişmez
     }
 
-    const outcomeKey = existingElement+'+'+incomingElement;
-    const outcomeKeyRev = incomingElement+'+'+existingElement;
-    const outcome = (outcomeKey in TERRAIN_REACTION_OUTCOME) ? TERRAIN_REACTION_OUTCOME[outcomeKey]
-                   : (outcomeKeyRev in TERRAIN_REACTION_OUTCOME) ? TERRAIN_REACTION_OUTCOME[outcomeKeyRev] : undefined;
-    if(outcome === undefined){
-      session.terrain[key] = { type: incomingTerrainKey, manual:false, locked:false, createdRound: session.roundNumber };
-    } else if(outcome === null){
-      delete session.terrain[key];
-    } else {
-      session.terrain[key] = { type: outcome, manual:false, locked:false, createdRound: session.roundNumber };
-    }
+    session.terrain[key] = { type: incomingTerrainKey, manual:false, locked:false, createdRound: session.roundNumber };
   }
 
   function computeReachableCells(actor){
@@ -1787,6 +1889,7 @@
     if(!t) return;
     t.row = row; t.col = col;
     actionMode = null; actingTokenId = null;
+    consumeResource(t, 'move');
     const terr = session.terrain[row+','+col];
     if(terr && terr.type){
       const def = terrainDef(terr.type);
@@ -1818,6 +1921,10 @@
 
   // ---------- Action menu ----------
   function openActionMenu(t){
+    if(me.role !== 'dm' && t.id !== session.activeTokenId){
+      alert(t.name + ' için sıra sende değil.');
+      return;
+    }
     if(hasBlockingStun(t)){
       alert(t.name + ' sersemlemiş/dondurulmuş durumda — bu tur aksiyon alamıyor. "Turu Bitir" ile geç.');
       return;
@@ -1825,12 +1932,69 @@
     actingTokenId = t.id;
     $('action-menu-title').textContent = t.name;
     $('am-melee').style.display = 'block';
+    renderActionMenuResources(t);
+    const res = t.turnResources || {action:true, bonus:true, move:true};
+    $('am-walk').style.opacity = res.move===false ? '.5' : '1';
+    $('am-melee').style.opacity = res.action===false ? '.5' : '1';
+    $('am-item').style.opacity = res.bonus===false ? '.5' : '1';
+    $('am-reset').style.display = me.role==='dm' ? 'block' : 'none';
     $('action-menu-backdrop').classList.add('open');
   }
+
+  function renderActionMenuResources(t){
+    const res = t.turnResources || {action:true, bonus:true, move:true};
+    const row = $('am-resource-row');
+    row.innerHTML = '';
+    const items = [
+      {key:'move', label:'🚶 Yürüme', color:'#5a7fa6'},
+      {key:'action', label:'⚔ Aksiyon', color:'#e2632a'},
+      {key:'bonus', label:'✨ Bonus', color:'#c99a3f'}
+    ];
+    items.forEach(it => {
+      const chip = document.createElement('div');
+      chip.className = 'quality-swatch';
+      const available = res[it.key] !== false;
+      chip.style.color = available ? it.color : 'var(--text-dim)';
+      if(available) chip.classList.add('sel');
+      chip.style.opacity = available ? '1' : '.5';
+      chip.textContent = it.label + (available ? '' : ' (kullanıldı)');
+      row.appendChild(chip);
+    });
+  }
+
+  async function resetTurnResources(t){
+    if(me.role !== 'dm') return;
+    t.turnResources = { action:true, bonus:true, move:true };
+    await pushRemote();
+    renderActionMenuResources(t);
+    renderAll();
+  }
+  $('am-reset').onclick = () => {
+    const t = session.tokens.find(x=>x.id===actingTokenId);
+    if(t) resetTurnResources(t);
+  };
+
+  // Bir birimin aksiyon/bonus/yürüme hakkı bittiğinde ve sırası kendisindeyse turu otomatik bitirir.
+  function consumeResource(t, kind){
+    if(!t.turnResources) t.turnResources = {action:true, bonus:true, move:true};
+    t.turnResources[kind] = false;
+    if(t.id === session.activeTokenId && !t.turnResources.action && !t.turnResources.bonus && !t.turnResources.move){
+      setTimeout(() => { endTurn(); }, 400);
+    }
+  }
+
   function closeActionMenu(){ $('action-menu-backdrop').classList.remove('open'); }
   $('am-cancel').onclick = () => { closeActionMenu(); actingTokenId = null; };
-  $('am-walk').onclick = () => { actionMode='walk'; closeActionMenu(); renderGrid(); };
-  $('am-melee').onclick = () => { actionMode='melee'; closeActionMenu(); renderGrid(); };
+  $('am-walk').onclick = () => {
+    const t = session.tokens.find(x=>x.id===actingTokenId);
+    if(t && t.turnResources && t.turnResources.move===false){ alert('Bu tur yürüme hakkın kalmadı.'); return; }
+    actionMode='walk'; closeActionMenu(); renderGrid();
+  };
+  $('am-melee').onclick = () => {
+    const t = session.tokens.find(x=>x.id===actingTokenId);
+    if(t && t.turnResources && t.turnResources.action===false){ alert('Bu tur aksiyon hakkın kalmadı.'); return; }
+    actionMode='melee'; closeActionMenu(); renderGrid();
+  };
   $('am-ability').onclick = () => {
     const t = session.tokens.find(x=>x.id===actingTokenId);
     closeActionMenu();
@@ -1842,6 +2006,7 @@
     const t = session.tokens.find(x=>x.id===actingTokenId);
     closeActionMenu();
     if(!t) return;
+    if(t.turnResources && t.turnResources.bonus===false){ alert('Bu tur bonus aksiyon hakkın kalmadı.'); return; }
     openItemPicker(t);
   };
 
@@ -1870,11 +2035,17 @@
 
   function openAbilityPicker(t){
     const abilities = (t.sheet.abilities||[]).filter(a => (a.name||'').trim());
-    const opts = abilities.map(a => ({
-      label: '<b>'+esc(a.name)+'</b> <span class="n">'+a.manaCost+' mana · menzil '+a.range+'</span>',
-      value: a,
-      disabled: (t.mp||0) < (a.manaCost||0)
-    }));
+    const res = t.turnResources || {action:true, bonus:true, move:true};
+    const opts = abilities.map(a => {
+      const actType = a.actionType || 'action';
+      const typeLabel = actType==='bonus' ? 'Bonus' : (actType==='reaction' ? 'Reaksiyon' : 'Aksiyon');
+      const resourceMissing = actType==='action' ? (res.action===false) : (actType==='bonus' ? (res.bonus===false) : false);
+      return {
+        label: '<b>'+esc(a.name)+'</b> <span class="n">'+typeLabel+' · '+a.manaCost+' mana · menzil '+a.range+'</span>',
+        value: a,
+        disabled: ((t.mp||0) < (a.manaCost||0)) || resourceMissing
+      };
+    });
     openPicker('Yetenek Seç', opts, (ability) => {
       pendingAbility = ability;
       actionMode = 'ability';
@@ -2076,6 +2247,8 @@
     });
     setTimeout(async () => {
       t.inBattle = false;
+      t.statusEffects = [];
+      t.elementState = null;
       await pushRemote();
       renderAll();
     }, 650);
@@ -2537,25 +2710,101 @@
     renderInventoryTab();
   };
 
+  let libTypeFilter = 'Hepsi';
+  let libSlotFilter = 'Hepsi';
+  let libQualityFilter = 'Hepsi';
+
   $('btn-add-from-library').onclick = () => {
     const t = session.tokens.find(x=>x.id===invCharId);
     if(!t) return;
-    const templates = session.itemTemplates || [];
-    const opts = templates.map(tpl => {
-      const q = qualityOf(tpl.quality);
-      return { label: '<span style="color:'+q.color+'">●</span> ' + esc(tpl.name) + ' <span class="n">('+esc(tpl.type)+')</span>', value: tpl };
-    });
-    openPicker('Kütüphaneden Eşya Seç', opts, (tpl) => {
-      addItemToInventory(t, {
-        id:'i'+Date.now()+Math.floor(Math.random()*999),
-        name: tpl.name, tag: tpl.type, quality: tpl.quality, equipSlot: tpl.equipSlot||'Silah',
-        targetMode: tpl.targetMode||'self', range: tpl.range||1, shape: tpl.shape||'1x1',
-        effects: JSON.parse(JSON.stringify(tpl.effects||[]))
-      });
-      pushRemote();
-      renderInventoryTab();
-    }, 'Kütüphanede henüz eşya yok — önce Eşyalar sekmesinden ekle.');
+    libTypeFilter = 'Hepsi'; libSlotFilter = 'Hepsi'; libQualityFilter = 'Hepsi';
+    renderLibraryPicker(t);
+    $('library-picker-backdrop').classList.add('open');
   };
+  $('lib-picker-close').onclick = () => $('library-picker-backdrop').classList.remove('open');
+
+  function buildFilterChip(row, label, value, currentVal, onPick){
+    const chip = document.createElement('div');
+    chip.className = 'quality-swatch' + (currentVal===value ? ' sel' : '');
+    chip.style.color = 'var(--gold-bright)';
+    chip.textContent = label;
+    chip.onclick = onPick;
+    row.appendChild(chip);
+  }
+
+  function renderLibraryPicker(t){
+    // Tür filtresi
+    const typeRow = $('lib-type-filter');
+    typeRow.innerHTML = '';
+    buildFilterChip(typeRow, 'Hepsi', 'Hepsi', libTypeFilter, () => { libTypeFilter='Hepsi'; renderLibraryPicker(t); });
+    ITEM_TYPES.forEach(ty => buildFilterChip(typeRow, ty, ty, libTypeFilter, () => { libTypeFilter=ty; if(ty!=='Giyilebilir') libSlotFilter='Hepsi'; renderLibraryPicker(t); }));
+
+    // Ekipman yeri filtresi (sadece Giyilebilir seçiliyken)
+    $('lib-slot-filter-wrap').style.display = (libTypeFilter==='Giyilebilir') ? 'block' : 'none';
+    if(libTypeFilter==='Giyilebilir'){
+      const slotRow = $('lib-slot-filter');
+      slotRow.innerHTML = '';
+      buildFilterChip(slotRow, 'Hepsi', 'Hepsi', libSlotFilter, () => { libSlotFilter='Hepsi'; renderLibraryPicker(t); });
+      WEARABLE_GROUPS.forEach(g => buildFilterChip(slotRow, g, g, libSlotFilter, () => { libSlotFilter=g; renderLibraryPicker(t); }));
+    }
+
+    // Kalite filtresi
+    const qRow = $('lib-quality-filter');
+    qRow.innerHTML = '';
+    buildFilterChip(qRow, 'Hepsi', 'Hepsi', libQualityFilter, () => { libQualityFilter='Hepsi'; renderLibraryPicker(t); });
+    QUALITIES.forEach(q => {
+      const chip = document.createElement('div');
+      chip.className = 'quality-swatch' + (libQualityFilter===q.key ? ' sel' : '');
+      chip.style.color = q.color;
+      const dot = document.createElement('span'); dot.className='dot'; dot.style.background=q.color;
+      chip.appendChild(dot);
+      chip.appendChild(document.createTextNode(q.label));
+      chip.onclick = () => { libQualityFilter = q.key; renderLibraryPicker(t); };
+      qRow.appendChild(chip);
+    });
+
+    // Filtrelenmiş liste
+    const list = $('lib-item-list');
+    list.innerHTML = '';
+    const templates = (session.itemTemplates||[]).filter(tpl =>
+      (libTypeFilter==='Hepsi' || tpl.type===libTypeFilter) &&
+      (libTypeFilter!=='Giyilebilir' || libSlotFilter==='Hepsi' || (tpl.equipSlot||'Silah')===libSlotFilter) &&
+      (libQualityFilter==='Hepsi' || tpl.quality===libQualityFilter)
+    );
+    if(templates.length===0){
+      const p = document.createElement('p');
+      p.className='map-hint'; p.style.marginTop='0';
+      p.textContent = 'Bu filtrelere uyan eşya yok.';
+      list.appendChild(p);
+    }
+    templates.forEach(tpl => {
+      const q = qualityOf(tpl.quality);
+      const card = document.createElement('div');
+      card.className = 'item-tpl-card';
+      card.style.borderLeftColor = q.color;
+      card.onclick = () => {
+        addItemToInventory(t, {
+          id:'i'+Date.now()+Math.floor(Math.random()*999),
+          name: tpl.name, tag: tpl.type, quality: tpl.quality, equipSlot: tpl.equipSlot||'Silah',
+          targetMode: tpl.targetMode||'self', range: tpl.range||1, shape: tpl.shape||'1x1',
+          effects: JSON.parse(JSON.stringify(tpl.effects||[]))
+        });
+        pushRemote();
+        renderInventoryTab();
+      };
+      const info = document.createElement('div'); info.className='tpl-info';
+      const nm = document.createElement('div'); nm.className='tpl-name'; nm.textContent = tpl.name;
+      const meta = document.createElement('div'); meta.className='tpl-meta';
+      meta.textContent = tpl.type + (tpl.type==='Giyilebilir' ? (' · '+(tpl.equipSlot||'Silah')) : '');
+      info.appendChild(nm); info.appendChild(meta);
+      card.appendChild(info);
+      const badge = document.createElement('span'); badge.className='item-quality-badge';
+      badge.style.background = q.color+'26'; badge.style.color = q.color; badge.style.border = '1px solid '+q.color;
+      badge.textContent = q.label;
+      card.appendChild(badge);
+      list.appendChild(card);
+    });
+  }
 
   // ---------- Creatures (DM only) ----------
   let crColor = COLORS[0];
@@ -2620,6 +2869,11 @@
       dup.onclick = (ev) => { ev.stopPropagation(); duplicateCreature(t.id); };
       card.appendChild(dup);
 
+      const clr = document.createElement('button');
+      clr.className = 'claim-btn'; clr.textContent = 'Temizle';
+      clr.onclick = (ev) => { ev.stopPropagation(); clearCreatureEffects(t.id); };
+      card.appendChild(clr);
+
       const rm = document.createElement('button');
       rm.className = 'rm-btn'; rm.textContent = '✕';
       rm.onclick = (ev) => { ev.stopPropagation(); removeToken(t.id); };
@@ -2627,6 +2881,18 @@
 
       wrap.appendChild(card);
     });
+  }
+
+  async function clearCreatureEffects(id){
+    const t = session.tokens.find(x=>x.id===id);
+    if(!t) return;
+    t.statusEffects = [];
+    t.elementState = null;
+    t.hp = getMaxHp(t);
+    t.mp = getMaxMp(t);
+    await pushRemote();
+    renderCreatureList();
+    renderAll();
   }
 
   async function duplicateCreature(id){
@@ -3005,17 +3271,24 @@
     const roll = 1 + Math.floor(Math.random()*20);
     const total = roll + skillVal;
     const ac = getEffectiveAC(target, false);
-    const hit = total >= ac;
-    let dmg = hit ? Math.max(0, getEffectiveDamageBonus(actor, false, 1 + (actor.sheet.meleeDamageBonus||0))) : 0;
-    if(hit) applyDamageWithExecute(actor, target, dmg, false);
+    let hit = total >= ac;
+    if(roll===1) hit = false;   // Kritik Başarısızlık: bonuslar ne olursa olsun ıska
+    if(roll===20) hit = true;   // Kritik Başarı: bonuslar ne olursa olsun isabet
+    let dmg = 0;
+    if(hit){
+      dmg = Math.max(0, getEffectiveDamageBonus(actor, false, 1 + (actor.sheet.meleeDamageBonus||0)));
+      if(roll===20) dmg *= 2; // Kritik Başarı: hasar 2 katı
+      applyDamageWithExecute(actor, target, dmg, false);
+    }
 
     const entry = {
       id:'r'+Date.now()+Math.floor(Math.random()*999), combat:true,
       charName:actor.name, targetName:target.name, skillLabel, roll, bonus:skillVal, total,
-      ac, hit, dmg, atkType:'fiziksel', ts:Date.now()
+      ac, hit, dmg, atkType:'fiziksel', ts:Date.now(), crit: roll===20, critFail: roll===1
     };
     logRoll(entry);
     if(hit) applyOnHitPassives(actor, target, dmg, 'fiziksel');
+    consumeResource(actor, 'action');
     actionMode = null; actingTokenId = null; pendingAbility = null;
     await pushRemote();
     renderAll();
@@ -3065,32 +3338,55 @@
       targets.forEach(target => {
         // Alan etkili (AoE) hasar her zaman isabet eder — tıpkı gerçek bir fireball gibi, alandaki herkes hasar alır.
         // Tekli hedef (1x1) saldırılar hâlâ normal isabet zarı (vs AC) gerektirir.
-        const landed = (hasDamageEffect && !isAoEShape) ? (total >= getEffectiveAC(target, isMagic)) : true;
+        let landed = true;
+        if(hasDamageEffect && !isAoEShape){
+          landed = total >= getEffectiveAC(target, isMagic);
+          if(roll===1) landed = false;   // Kritik Başarısızlık: bonuslar ne olursa olsun ıska
+          if(roll===20) landed = true;   // Kritik Başarı: bonuslar ne olursa olsun isabet
+        }
         if(landed){
           effects.forEach(eff => {
             if(eff.type==='damage'){
               let doDamage = true;
+              let isCrit = (roll===20);
               if(isAoEShape){
-                // Hasar için 1d4'lük element kurtarması değil, saldırganın zarına karşı kontrollü bir zar atılır:
-                // fiziksel hasarsa Direnç, büyüselse İrade zarı. Savunanın toplamı saldırganınkinden büyükse hasar almaz.
-                const defenseStatLabel = isMagic ? 'İRADE' : 'DİRENÇ';
-                const defenseStatVal = findSkillValue(target, defenseStatLabel);
-                const defenseRoll = 1 + Math.floor(Math.random()*20);
-                const defenseTotal = defenseRoll + defenseStatVal;
-                if(defenseTotal > total){
+                if(roll===1){
                   doDamage = false;
-                  logSystemEvent(target.name + ' (' + (isMagic?'İrade':'Direnç') + ' ' + defenseRoll + '+' + defenseStatVal + '=' + defenseTotal + ') saldırı zarını (' + total + ') aştı, hasar almadı.');
+                  logSystemEvent(target.name + ': saldırganın zarı Kritik Başarısızlık (1) — hasar uygulanmadı.');
+                } else if(roll===20){
+                  doDamage = true;
+                  logSystemEvent(actor.name + ' Kritik Başarı (20)! ' + target.name + ' kesin hasar alıyor.');
                 } else {
-                  logSystemEvent(target.name + ' savunması yetersiz kaldı (' + defenseTotal + ' vs ' + total + '), hasar aldı.');
+                  // Hasar için 1d4'lük element kurtarması değil, saldırganın zarına karşı kontrollü bir zar atılır:
+                  // fiziksel hasarsa Direnç, büyüselse İrade zarı. Savunanın toplamı saldırganınkinden büyükse hasar almaz.
+                  const defenseStatLabel = isMagic ? 'İRADE' : 'DİRENÇ';
+                  const defenseStatVal = findSkillValue(target, defenseStatLabel);
+                  const defenseRoll = 1 + Math.floor(Math.random()*20);
+                  const defenseTotal = defenseRoll + defenseStatVal;
+                  if(defenseTotal > total){
+                    doDamage = false;
+                    logSystemEvent(target.name + ' (' + (isMagic?'İrade':'Direnç') + ' ' + defenseRoll + '+' + defenseStatVal + '=' + defenseTotal + ') saldırı zarını (' + total + ') aştı, hasar almadı.');
+                  } else {
+                    logSystemEvent(target.name + ' savunması yetersiz kaldı (' + defenseTotal + ' vs ' + total + '), hasar aldı.');
+                  }
                 }
               }
               if(doDamage){
-                const dmg = Math.max(0, getEffectiveDamageBonus(actor, isMagic, rollDiceExpr(eff.params.amount)));
+                let dmg = Math.max(0, getEffectiveDamageBonus(actor, isMagic, rollDiceExpr(eff.params.amount)));
+                if(isCrit) dmg *= 2;
                 applyDamageWithExecute(actor, target, dmg, isMagic);
                 applyOnHitPassives(actor, target, dmg, ability.dmgType);
               }
+            } else if(eff.type==='heal'){
+              // İyileştirme: hiçbir savunma zarı yok, her zaman uygulanır; Kritik Başarı (20) gelirse 2 katına çıkar.
+              let amt = rollDiceExpr(eff.params.amount);
+              if(roll===20) amt *= 2;
+              const before = target.hp;
+              target.hp = Math.min(getMaxHp(target), target.hp + amt);
+              queueFloat(target.id, target.hp - before);
+              logSystemEvent(target.name + ' ' + (ability.name||'yetenek') + ' ile ' + amt + ' can yeniledi.' + (roll===20 ? ' (Kritik Başarı — 2 kat!)' : ''));
             } else {
-              // İyileştirme gibi pozitif etkiler: hiçbir savunma zarı yok, her zaman uygulanır.
+              // Diğer pozitif/nötr etkiler: savunma zarı yok, her zaman uygulanır.
               applyEffectInstance(target, eff, ability.name || 'yetenek');
             }
           });
@@ -3109,6 +3405,9 @@
     };
     logRoll(entry);
 
+    if((ability.actionType||'action') !== 'reaction'){
+      consumeResource(actor, (ability.actionType==='bonus') ? 'bonus' : 'action');
+    }
     actionMode = null; actingTokenId = null; pendingAbility = null;
     await pushRemote();
     renderAll();
@@ -3388,6 +3687,7 @@
     session.rollLog = session.rollLog || [];
     session.rollLog.unshift(entry);
     session.rollLog = session.rollLog.slice(0, 15);
+    consumeResource(actor, 'bonus');
     actingTokenId = null;
     await pushRemote();
     renderAll();
@@ -3424,6 +3724,7 @@
     session.rollLog.unshift(entry);
     session.rollLog = session.rollLog.slice(0, 15);
 
+    consumeResource(actor, 'bonus');
     actionMode = null; actingTokenId = null; pendingItem = null;
     await pushRemote();
     renderAll();
@@ -3606,6 +3907,17 @@
       shapeSel.onchange = () => { ab.shape = shapeSel.value; pushRemote(); };
       card.appendChild(shapeSel);
 
+      const actTypeLbl = document.createElement('label'); actTypeLbl.className='effect-param-label'; actTypeLbl.textContent='Aksiyon Türü';
+      card.appendChild(actTypeLbl);
+      const actTypeSel = document.createElement('select'); actTypeSel.disabled = !editable;
+      [['action','Aksiyon'],['bonus','Bonus Aksiyon'],['reaction','Reaksiyon']].forEach(([v,l]) => {
+        const o = document.createElement('option'); o.value=v; o.textContent=l;
+        if((ab.actionType||'action')===v) o.selected = true;
+        actTypeSel.appendChild(o);
+      });
+      actTypeSel.onchange = () => { ab.actionType = actTypeSel.value; pushRemote(); };
+      card.appendChild(actTypeSel);
+
       const effTitle = document.createElement('h3'); effTitle.className='sheet-section-title'; effTitle.style.marginTop='14px'; effTitle.style.fontSize='11px';
       effTitle.textContent = 'EFEKTLER';
       card.appendChild(effTitle);
@@ -3634,7 +3946,7 @@
     const t = session.tokens.find(x=>x.id===abilitiesCharId); if(!t) return;
     t.sheet.abilities.push({
       id:'ab'+Date.now()+Math.floor(Math.random()*999),
-      name:'', desc:'', manaCost:1, range:1, dmgType:'fiziksel', skillLabel:'', shape:'1x1', spellSchool:'Diğer',
+      name:'', desc:'', manaCost:1, range:1, dmgType:'fiziksel', skillLabel:'', shape:'1x1', spellSchool:'Diğer', actionType:'action',
       effects:[blankEffect(), blankEffect(), blankEffect()]
     });
     renderAbilitiesList(t, true);
