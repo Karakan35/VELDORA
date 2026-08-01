@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
-<title>Savaş Haritası</title>
+<title>The Saga of Veldora</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&display=swap');
 
@@ -411,8 +411,8 @@
   <!-- SETUP SCREEN -->
   <div id="setup-screen" class="setup-wrap">
     <div class="setup-title">
-      <h1>⚔ Savaş Haritası</h1>
-      <p>Masa başındaki oturumun için kareli taktik harita — herkes kendi cihazından bağlanır.</p>
+      <h1>⚔ The Saga of Veldora ⚔</h1>
+      <p>Destansı bir maceraya dostlarınla yelken aç.</p>
     </div>
 
     <div class="field">
@@ -428,6 +428,8 @@
       </div>
       <p style="color:var(--text-dim); font-size:11px; margin-top:6px;">Not: Yeni oda kurarsan otomatik Zindan Ustası olursun. Bu seçim var olan bir odaya katılırken geçerli.</p>
     </div>
+
+    <button class="primary-btn" id="btn-quick-join" type="button">⚔ Veldora'ya Giriş Yap</button>
 
     <div class="field">
       <label>Oda Kodu</label>
@@ -605,6 +607,14 @@
     <div class="field">
       <label>Renk</label>
       <div class="color-row" id="cr-colors"></div>
+    </div>
+    <div class="field">
+      <label>Zeka</label>
+      <select id="cr-ai">
+        <option value="aggressive">Agresif (varsayılan)</option>
+        <option value="low">Düşük Zeka</option>
+        <option value="high">Yüksek Zeka</option>
+      </select>
     </div>
     <p style="color:var(--text-dim); font-size:11px; margin:0;">Saldırı yeteneklerini ve özellik değerlerini, yaratık listesinden karta dokunarak açacağın kağıttan ekleyebilirsin.</p>
     <div class="modal-actions">
@@ -1143,6 +1153,11 @@
     }catch(e){ setupError('Bu kodda bir oda bulunamadı: ' + (e && e.message ? e.message : e)); }
   };
 
+  $('btn-quick-join').onclick = () => {
+    $('in-code').value = 'NX9H';
+    $('btn-join').click();
+  };
+
   function setupError(msg){ $('setup-status').textContent = msg; }
   function genCode(){
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -1333,6 +1348,7 @@
     if(!t.turnResources) t.turnResources = { action:true, bonus:true, move:true };
     if(!t.kind) t.kind = 'character';
     if(t.inBattle == null) t.inBattle = (t.kind === 'character');
+    if(t.kind==='creature' && !t.aiType) t.aiType = 'aggressive';
     if(t.hp == null) t.hp = getMaxHp(t);
     if(t.mp == null) t.mp = getMaxMp(t);
   }
@@ -1501,6 +1517,7 @@
     await autoSkipStunned();
     await pushRemote();
     renderAll();
+    await maybeRunAI();
   }
 
   async function endTurn(){
@@ -1515,6 +1532,7 @@
     await autoSkipStunned();
     await pushRemote();
     renderAll();
+    await maybeRunAI();
   }
 
   function terrainKeyForElement(elementType){
@@ -1810,6 +1828,232 @@
   function getEnemiesOf(t){
     return session.tokens.filter(x => (x.kind!=='creature'||x.inBattle) && x.id!==t.id && isEnemyOf(x, t));
   }
+
+  // ================= DÜŞMAN YAPAY ZEKASI (Agresif / Düşük Zeka / Yüksek Zeka) =================
+  // Bir yaratığın sırası geldiğinde, DM istemcisinde otomatik çalışır (bkz. maybeRunAI).
+  // Mevcut resolve* fonksiyonlarını (resolveMeleeAttack, resolveAbilityAtCell, moveToken, resolveItemUse)
+  // doğrudan çağırır — böylece kritik/element/kaynak/AoE gibi tüm normal kurallar otomatik işler.
+
+  function aiChebyshev(a, b){ return Math.max(Math.abs(a.row-b.row), Math.abs(a.col-b.col)); }
+
+  function aiLiveTargets(creature){
+    return getEnemiesOf(creature).filter(t => t.hp>0 && (t.kind!=='creature' || t.inBattle));
+  }
+
+  function aiNearest(from, list){
+    if(!list.length) return null;
+    return list.slice().sort((a,b) => aiChebyshev(from,a) - aiChebyshev(from,b))[0];
+  }
+
+  function aiDiceAverage(expr){
+    const s = String(expr==null?'':expr).trim();
+    const m = s.match(/^(\d+)d(\d+)$/i);
+    if(m){ const n = parseInt(m[1]), sides = parseInt(m[2]); return n*(sides+1)/2; }
+    const num = parseFloat(s);
+    return isNaN(num) ? 0 : num;
+  }
+
+  function aiAbilityDamageValue(ability){
+    const dmgEff = (ability.effects||[]).find(e => e && e.type==='damage');
+    if(!dmgEff) return 0;
+    return aiDiceAverage(dmgEff.params.amount);
+  }
+
+  // Yeteneğin sadece iyileştirme/olumlu etkiler içerip içermediğini kontrol eder (düşük zeka bunları düşmana kullanmaz)
+  function aiIsOnlyPositive(ability){
+    const effs = (ability.effects||[]).filter(e => e && e.type && e.type!=='none');
+    if(effs.length===0) return true;
+    const positiveTypes = ['heal','manaHeal','maxHpBoost','maxManaBoost','cleanse'];
+    return effs.every(e => positiveTypes.includes(e.type));
+  }
+
+  function aiUsableAbilities(creature){
+    return (creature.sheet.abilities||[]).filter(a => (a.name||'').trim());
+  }
+
+  function aiBestDamageAbility(creature, actionTypeFilter){
+    const abilities = aiUsableAbilities(creature).filter(a => aiAbilityDamageValue(a) > 0);
+    const filtered = abilities.filter(a => (a.actionType||'action') === (actionTypeFilter||'action'));
+    if(filtered.length===0) return null;
+    return filtered.slice().sort((a,b) => aiAbilityDamageValue(b) - aiAbilityDamageValue(a))[0];
+  }
+
+  function aiResourceKeyFor(actionType){ return actionType==='bonus' ? 'bonus' : 'action'; }
+  function aiResourceAvailable(creature, actionType){
+    const res = creature.turnResources || {action:true,bonus:true,move:true};
+    return res[aiResourceKeyFor(actionType)] !== false;
+  }
+
+  // Hedefe doğru, ulaşabildiği en yakın hücreye yürür (mevcut hız/menzil sistemini kullanır).
+  async function aiMoveToward(creature, target){
+    if(creature.turnResources && creature.turnResources.move===false) return;
+    const reach = computeReachableCells(creature);
+    const keys = Object.keys(reach);
+    if(!keys.length) return;
+    const curDist = aiChebyshev(creature, target);
+    let best = null, bestDist = curDist;
+    keys.forEach(key => {
+      const parts = key.split(',');
+      const r = parseInt(parts[0]), c = parseInt(parts[1]);
+      const d = Math.max(Math.abs(r-target.row), Math.abs(c-target.col));
+      if(d < bestDist){ bestDist = d; best = {r,c}; }
+    });
+    if(best) await moveToken(creature.id, best.r, best.c);
+  }
+
+  // Yüksek Zeka için: elden geldiğince tehlikeli (yanan/zehirli/elektrikli) zeminden kaçınarak yürür.
+  async function aiMoveTowardSmart(creature, target, riskOk){
+    if(creature.turnResources && creature.turnResources.move===false) return;
+    const reach = computeReachableCells(creature);
+    const keys = Object.keys(reach);
+    if(!keys.length) return;
+    function danger(r,c){
+      const cell = session.terrain[r+','+c];
+      if(!cell || !cell.type) return 0;
+      return (cell.type==='yanan' || cell.type==='zehirli' || cell.type==='elektrikli') ? 1 : 0;
+    }
+    let candidates = keys.map(key => {
+      const parts = key.split(',');
+      const r = parseInt(parts[0]), c = parseInt(parts[1]);
+      return { r, c, d: Math.max(Math.abs(r-target.row), Math.abs(c-target.col)), danger: danger(r,c) };
+    });
+    if(!riskOk){
+      const safe = candidates.filter(x => x.danger===0);
+      if(safe.length) candidates = safe;
+    }
+    candidates.sort((a,b) => a.d - b.d || a.danger - b.danger);
+    const curDist = aiChebyshev(creature, target);
+    const best = candidates[0];
+    if(best && best.d < curDist) await moveToken(creature.id, best.r, best.c);
+  }
+
+  // ---------- Agresif: her zaman en yakın oyuncuyu hedef alır, elindeki en güçlü hasar yeteneğini kullanır,
+  // manası yoksa düz vurur; tuzak/element umursamaz, en kısa yoldan yaklaşır. ----------
+  async function aiRunAggressive(creature){
+    const targets = aiLiveTargets(creature);
+    if(!targets.length) return;
+    const target = aiNearest(creature, targets);
+    const meleeRange = creature.sheet.meleeRange || 1;
+
+    let dist = aiChebyshev(creature, target);
+    const actionAbility = aiBestDamageAbility(creature, 'action');
+    const effRange = Math.max(meleeRange, actionAbility ? (actionAbility.range||1) : 0);
+    if(dist > effRange){ await aiMoveToward(creature, target); dist = aiChebyshev(creature, target); }
+
+    if(actionAbility && (creature.mp||0) >= (actionAbility.manaCost||0) && dist <= (actionAbility.range||1) && aiResourceAvailable(creature,'action')){
+      await resolveAbilityAtCell(creature, actionAbility, target.row, target.col);
+    } else if(dist <= meleeRange && aiResourceAvailable(creature,'action')){
+      await resolveMeleeAttack(creature, target);
+    }
+
+    if(aiResourceAvailable(creature,'bonus')){
+      const bonusAbility = aiBestDamageAbility(creature, 'bonus');
+      if(bonusAbility && (creature.mp||0) >= (bonusAbility.manaCost||0)){
+        const d = aiChebyshev(creature, target);
+        if(d <= (bonusAbility.range||1)) await resolveAbilityAtCell(creature, bonusAbility, target.row, target.col);
+      }
+    }
+  }
+
+  // ---------- Düşük Zeka: rastgele bir hedefe rastgele (saldırı amaçlı) bir yetenekle vurur,
+  // menzilde tek hedef varsa ona vurur, iyileştirici/olumlu yetenekleri düşmana kullanmaz. ----------
+  async function aiRunLowIntelligence(creature){
+    const targets = aiLiveTargets(creature);
+    if(!targets.length) return;
+    const meleeRange = creature.sheet.meleeRange || 1;
+    const inRangeNow = targets.filter(t => aiChebyshev(creature,t) <= meleeRange);
+    let target = inRangeNow.length===1 ? inRangeNow[0] : targets[Math.floor(Math.random()*targets.length)];
+
+    let dist = aiChebyshev(creature, target);
+    if(dist > meleeRange){ await aiMoveToward(creature, target); dist = aiChebyshev(creature, target); }
+
+    const candidates = aiUsableAbilities(creature).filter(a => !aiIsOnlyPositive(a));
+    const affordable = candidates.filter(a =>
+      (creature.mp||0) >= (a.manaCost||0) && aiChebyshev(creature,target) <= (a.range||1) && aiResourceAvailable(creature, a.actionType||'action')
+    );
+
+    if(affordable.length && Math.random() < 0.7){
+      const pick = affordable[Math.floor(Math.random()*affordable.length)];
+      await resolveAbilityAtCell(creature, pick, target.row, target.col);
+    } else if(aiChebyshev(creature,target) <= meleeRange && aiResourceAvailable(creature,'action')){
+      await resolveMeleeAttack(creature, target);
+    }
+  }
+
+  // ---------- Yüksek Zeka: öldürülebilecek hedefi önceliklendirir, yoksa en az canlıya yönelir (yoldaki
+  // tankı da ihmal etmez), tehlikeli zeminden kaçınır (öldürme fırsatı varsa göze alır), gerekirse iksir içer. ----------
+  async function aiRunHighIntelligence(creature){
+    const targets = aiLiveTargets(creature);
+    if(!targets.length) return;
+
+    // Kendi canı düşükse ve iyileştirici kullanılabilir eşyası varsa (bonus hakkı varsa) içer.
+    const maxHp = getMaxHp(creature);
+    if(maxHp>0 && (creature.hp/maxHp) < 0.35 && aiResourceAvailable(creature,'bonus')){
+      const healItem = (creature.inventory||[]).find(i => {
+        const tagUp = (i.tag||'').trim().toLocaleUpperCase('tr');
+        if(tagUp !== 'KULLANILABİLİR') return false;
+        return (i.effects||[]).some(e => e && (e.type==='heal' || e.type==='maxHpBoost'));
+      });
+      if(healItem) await resolveItemUse(creature, healItem);
+    }
+
+    const meleeRange = creature.sheet.meleeRange || 1;
+    const actionAbility = aiBestDamageAbility(creature, 'action');
+    const effRange = Math.max(meleeRange, actionAbility ? (actionAbility.range||1) : 0);
+
+    function estimateBurst(){
+      const abDmg = (actionAbility && (creature.mp||0) >= (actionAbility.manaCost||0)) ? aiAbilityDamageValue(actionAbility) : 0;
+      const meleeDmg = 1 + (creature.sheet.meleeDamageBonus||0);
+      return Math.max(abDmg, meleeDmg);
+    }
+    const burst = estimateBurst();
+    const killTarget = targets.find(t => aiChebyshev(creature,t) <= effRange && t.hp <= burst) || null;
+
+    let target = killTarget || targets.slice().sort((a,b) => getMaxHp(a)-getMaxHp(b))[0];
+
+    let dist = aiChebyshev(creature, target);
+    if(dist > effRange){
+      await aiMoveTowardSmart(creature, target, !!killTarget);
+      dist = aiChebyshev(creature, target);
+    }
+
+    if(actionAbility && (creature.mp||0) >= (actionAbility.manaCost||0) && dist <= (actionAbility.range||1) && aiResourceAvailable(creature,'action')){
+      await resolveAbilityAtCell(creature, actionAbility, target.row, target.col);
+    } else if(dist <= meleeRange && aiResourceAvailable(creature,'action')){
+      await resolveMeleeAttack(creature, target);
+    }
+
+    if(aiResourceAvailable(creature,'bonus')){
+      const bonusAbility = aiBestDamageAbility(creature, 'bonus');
+      if(bonusAbility && (creature.mp||0) >= (bonusAbility.manaCost||0)){
+        const d = aiChebyshev(creature, target);
+        if(d <= (bonusAbility.range||1)) await resolveAbilityAtCell(creature, bonusAbility, target.row, target.col);
+      }
+    }
+  }
+
+  async function runCreatureAI(creature){
+    if(!creature || creature.kind!=='creature' || !creature.inBattle || creature.hp<=0) return;
+    if(hasBlockingStun(creature)) return;
+    const type = creature.aiType || 'aggressive';
+    try{
+      if(type==='low') await aiRunLowIntelligence(creature);
+      else if(type==='high') await aiRunHighIntelligence(creature);
+      else await aiRunAggressive(creature);
+    }catch(e){ console.error('AI hatasi:', e); }
+  }
+
+  // Sıra bir yaratığa geldiğinde (DM istemcisinde) otomatik oynar, sonra turu kendisi bitirir.
+  // endTurn() zincirlenerek bir sonraki yaratık için de aynısını tetikler; insan sırasına gelince durur.
+  async function maybeRunAI(){
+    if(me.role !== 'dm') return;
+    const active = session.tokens.find(t => t.id === session.activeTokenId);
+    if(active && active.kind==='creature' && active.inBattle && active.hp>0){
+      await runCreatureAI(active);
+      await endTurn();
+    }
+  }
+
 
   let terrainPaintDef = null;
   async function paintTerrainCell(row, col){
@@ -2775,6 +3019,18 @@
       info.appendChild(nameRow); info.appendChild(statusLine);
       renderStatusBadges(t, info);
 
+      const aiSel = document.createElement('select');
+      aiSel.style.marginTop='4px'; aiSel.style.fontSize='11px'; aiSel.style.padding='4px 6px';
+      aiSel.style.background='var(--ink-3)'; aiSel.style.border='1px solid var(--line)'; aiSel.style.borderRadius='5px'; aiSel.style.color='var(--text)';
+      [['aggressive','🗡 Agresif'],['low','🤪 Düşük Zeka'],['high','🧠 Yüksek Zeka']].forEach(([v,l]) => {
+        const o = document.createElement('option'); o.value=v; o.textContent=l;
+        if((t.aiType||'aggressive')===v) o.selected = true;
+        aiSel.appendChild(o);
+      });
+      aiSel.onclick = (ev) => ev.stopPropagation();
+      aiSel.onchange = async (ev) => { ev.stopPropagation(); t.aiType = aiSel.value; await pushRemote(); };
+      info.appendChild(aiSel);
+
       function buildRow(statKey, maxVal, colorFn){
         const row = document.createElement('div'); row.className = 'hp-row';
         const track = document.createElement('div'); track.className='hp-track';
@@ -3136,6 +3392,7 @@
 
   $('btn-add-creature').onclick = () => {
     $('cr-name').value=''; $('cr-acphys').value=5; $('cr-acmag').value=5; $('cr-maxhp').value=10; $('cr-maxmp').value=0;
+    $('cr-ai').value='aggressive';
     const row = $('cr-colors'); row.innerHTML='';
     crColor = COLORS[session.tokens.length % COLORS.length];
     COLORS.forEach(c => {
@@ -3159,7 +3416,7 @@
     const newCreature = {
       id:'t'+Date.now()+Math.floor(Math.random()*999),
       name, color:crColor, row:0, col:0, owner:null,
-      kind:'creature', inBattle:false,
+      kind:'creature', inBattle:false, aiType: $('cr-ai').value || 'aggressive',
       sheet, hp:sheet.fixedMaxHp, mp:sheet.fixedMaxMp
     };
     session.tokens.push(newCreature);
