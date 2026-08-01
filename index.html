@@ -1400,8 +1400,6 @@
     session.turnOrder = sorted.map(t=>t.id);
     session.activeTokenId = session.turnOrder[0] || null;
     session.roundNumber = 1;
-    const newActive = session.tokens.find(t=>t.id===session.activeTokenId);
-    if(newActive) await tickStatusEffects(newActive);
     await pushRemote();
     renderAll();
   }
@@ -1414,6 +1412,7 @@
     if(activeIds.length === 0) return;
     const active = session.tokens.find(t=>t.id===session.activeTokenId);
     if(!(me.role==='dm' || (active && active.owner===me.name))) return;
+    if(active) await tickStatusEffects(active); // turu biten karakterin üzerindeki etkiler şimdi işler
     const curIdx = activeIds.indexOf(session.activeTokenId);
     const nextIdx = (curIdx+1) % activeIds.length;
     if(nextIdx <= curIdx || curIdx===-1){
@@ -1421,8 +1420,6 @@
       decayTerrain();
     }
     session.activeTokenId = activeIds[nextIdx];
-    const newActive = session.tokens.find(t=>t.id===session.activeTokenId);
-    if(newActive) await tickStatusEffects(newActive);
     await pushRemote();
     renderAll();
   }
@@ -3088,7 +3085,8 @@
   }
 
   async function tickStatusEffects(t){
-    if(!t || !t.statusEffects || t.statusEffects.length===0) return;
+    if(!t) return;
+    if(!t.statusEffects) t.statusEffects = [];
     const stillActive = [];
     for(const se of t.statusEffects){
       if(se.effectType==='dot'){
