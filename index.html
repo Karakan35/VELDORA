@@ -97,6 +97,7 @@
       linear-gradient(90deg, var(--line) 1px, transparent 1px);
   }
   .cell-range{ position:absolute; background:rgba(201,154,63,.16); border:1px solid rgba(201,154,63,.4); border-radius:3px; }
+  .terrain-cell{ position:absolute; border:1px solid; border-radius:3px; }
   .cell-range.melee-tint{ background:rgba(226,99,42,.16); border-color:rgba(226,99,42,.45); }
   .cell-range.ability-tint{ background:rgba(90,127,166,.2); border-color:rgba(90,127,166,.55); }
   @keyframes tokenDeath{
@@ -115,10 +116,13 @@
   }
   .float-number.heal{ color:var(--ok); text-shadow:0 0 8px rgba(111,143,90,.85); }
   .float-number.dmg{ color:var(--ember-bright); text-shadow:0 0 8px rgba(226,99,42,.85); }
+  .float-number.mana{ color:var(--mana); text-shadow:0 0 8px rgba(90,127,166,.9); }
   @keyframes healGlow{ 0%{ box-shadow:0 0 0 0 rgba(111,143,90,.9); } 100%{ box-shadow:0 0 20px 8px rgba(111,143,90,0); } }
   @keyframes dmgGlow{ 0%{ box-shadow:0 0 0 0 rgba(226,99,42,.9); } 100%{ box-shadow:0 0 20px 8px rgba(226,99,42,0); } }
+  @keyframes manaGlow{ 0%{ box-shadow:0 0 0 0 rgba(90,127,166,.9); } 100%{ box-shadow:0 0 20px 8px rgba(90,127,166,0); } }
   .token-heal-glow{ animation:healGlow .55s ease; }
   .token-damage-glow{ animation:dmgGlow .55s ease; }
+  .token-mana-glow{ animation:manaGlow .55s ease; }
   .token{
     position:absolute; border-radius:50%; display:flex; align-items:center; justify-content:center;
     font-family:'Cinzel',serif; font-weight:700; color:#1a1220; font-size:13px;
@@ -131,6 +135,10 @@
     position:absolute; bottom:-6px; left:8%; width:84%; height:4px; background:#000a; border-radius:3px; overflow:hidden;
   }
   .token .hp-bar-mini i{ display:block; height:100%; background:var(--ok);}
+  .element-badge{
+    position:absolute; top:-9px; right:-6px; font-size:13px; line-height:1; filter:drop-shadow(0 1px 2px rgba(0,0,0,.7));
+    pointer-events:none;
+  }
   .map-hint{ text-align:center; font-size:11px; color:var(--text-dim); margin-top:10px;}
   .dice-panel{ margin-top:22px; padding-top:16px; border-top:1px solid var(--line); }
   .dice-char-row{ display:flex; gap:8px; overflow-x:auto; margin-bottom:12px; padding-bottom:2px; }
@@ -445,6 +453,7 @@
           <div id="grid"></div>
         </div>
         <div class="map-hint" id="map-hint">Bir karaktere dokun, ne yapmak istediğini seç.</div>
+        <button class="ghost-btn" id="btn-paint-terrain" style="width:100%; display:none;">🗺 Zemin Boya</button>
 
         <div class="dice-panel">
           <h3 class="sheet-section-title">ZAR AT</h3>
@@ -650,6 +659,19 @@
       <div class="quality-row" id="ie-quality-row"></div>
     </div>
 
+    <h3 class="sheet-section-title" style="margin-top:20px;">HEDEF</h3>
+    <div class="field">
+      <label>Kullanınca</label>
+      <select id="ie-target-mode">
+        <option value="self">Kendime Etki</option>
+        <option value="target">Hedefe Etki</option>
+      </select>
+    </div>
+    <div class="field-row" id="ie-target-range-row" style="display:none;">
+      <div class="field"><label>Menzil</label><input id="ie-range" type="number" min="1" value="1"></div>
+      <div class="field"><label>Etki Alanı</label><select id="ie-shape"></select></div>
+    </div>
+
     <h3 class="sheet-section-title" style="margin-top:20px;">EFEKTLER</h3>
     <div id="ie-effects"></div>
   </div>
@@ -690,7 +712,7 @@
   ];
 
   const ITEM_TYPES = ['Kullanılabilir','Giyilebilir','Malzeme','Ivır Zıvır','Diğer'];
-  const BUFFABLE_STATS = ['acBoost','dmgBoost','statBonus','movementBoost','maxHpBoost'];
+  const BUFFABLE_STATS = ['acBoost','dmgBoost','statBonus','movementBoost','maxHpBoost','maxManaBoost'];
   const QUALITIES = [
     {key:'beyaz',    label:'Değersiz',  color:'#c9c2b8'},
     {key:'yesil',    label:'Yaygın',    color:'#6f8f5a'},
@@ -718,6 +740,12 @@
                   {key:'amount', label:'Miktar', type:'number'} ] },
     maxHpBoost:{ label:'Maksimum Can Artışı', params:[
                   {key:'amount', label:'Miktar', type:'number'} ] },
+    manaHeal: { label:'Mana Yenileme', params:[
+                  {key:'amount', label:'Miktar', type:'text', placeholder:'ör. 5 ya da 2d4'} ] },
+    maxManaBoost:{ label:'Maksimum Mana Artışı', params:[
+                  {key:'amount', label:'Miktar', type:'number'} ] },
+    manasteal:{ label:'Mana Çalma (Manasteal)', params:[
+                  {key:'percent', label:'Oran (%)', type:'number'} ] },
     dmgBoost: { label:'Hasar Artışı', params:[
                   {key:'dmgType', label:'Tür', type:'select', options:['Fiziksel','Büyüsel']},
                   {key:'amount', label:'Miktar', type:'number'} ] },
@@ -726,7 +754,7 @@
                   {key:'statusName', label:'Durum', type:'select', options:['Stun','Freeze','Sleep','Shocked']},
                   {key:'duration', label:'Süre (Tur)', type:'number'} ] },
     resistance:{ label:'Direnç (Resistance)', params:[
-                  {key:'statusName', label:'Hangi Duruma', type:'text', placeholder:'ör. Stun'} ] },
+                  {key:'statusName', label:'Hangi Duruma', type:'select', options:['Yanma','Islanma','Donma','Şoklanma (Elektrik)','Zehirlenme','Stun','Sleep','Silence']} ] },
     silence:  { label:'Susturma (Silence)', params:[
                   {key:'duration', label:'Süre (Tur)', type:'number'} ] },
     lifesteal:{ label:'Can Çalma (Lifesteal)', params:[
@@ -746,8 +774,47 @@
   function blankEffect(){ return {type:'none', params:{}}; }
   function blankItemTemplate(){
     return { id:'it'+Date.now()+Math.floor(Math.random()*999), name:'Yeni Eşya', type:'Diğer', quality:'beyaz',
+      targetMode:'self', range:1, shape:'1x1',
       effects:[blankEffect(), blankEffect(), blankEffect()] };
   }
+  // ---------- Zemin (terrain) sistemi ----------
+  const TERRAIN_TYPES = [
+    {key:'yanan',      label:'Yanan Kare',        color:'#e2632a', element:'yanma'},
+    {key:'islak',      label:'Islak Kare',        color:'#4a90d9', element:'islak'},
+    {key:'buzlu',      label:'Buzlu Kare',        color:'#8fd3e8', element:'soguk'},
+    {key:'zehirli',    label:'Zehirli Kare',      color:'#7a9f3f', element:'zehir'},
+    {key:'elektrikli', label:'Elektrikli Kare',   color:'#e8d44d', element:'elektrik'},
+    {key:'mor',        label:'Yavaşlatıcı Kare',  color:'#9a5aa6', element:null, slowCost:2}
+  ];
+  function terrainDef(key){ return TERRAIN_TYPES.find(t=>t.key===key); }
+
+  const RESISTANCE_MATCH = {
+    yanma:'Yanma', islak:'Islanma', soguk:'Donma', zehir:'Zehirlenme', elektrik:'Şoklanma (Elektrik)',
+    sok:'Şoklanma (Elektrik)', donma:'Donma'
+  };
+  const ELEMENT_VISUALS = {
+    yanma:  {icon:'🔥', color:'#e2632a'},
+    islak:  {icon:'💧', color:'#4a90d9'},
+    soguk:  {icon:'❄️', color:'#8fd3e8'},
+    zehir:  {icon:'☠️', color:'#7a9f3f'},
+    elektrik:{icon:'⚡', color:'#e8d44d'},
+    sok:    {icon:'⚡', color:'#e8d44d'},
+    donma:  {icon:'❄️', color:'#8fd3e8'}
+  };
+  const SPELL_SCHOOL_ELEMENT = { 'Ateş':'yanma', 'Su':'islak', 'Elektrik':'elektrik', 'Zehir':'zehir', 'Buz':'soguk' };
+  const SPELL_SCHOOLS = ['Ateş','Su','Elektrik','Zehir','Buz','Korku','Diğer'];
+
+  const AOE_SHAPES = {
+    '1x1': { label:'1x1 (Tek Kare)', cells:[[0,0]] },
+    'plus':{ label:'+ (Artı: Sağ/Sol/Üst/Alt)', cells:[[0,0],[-1,0],[1,0],[0,-1],[0,1]] },
+    '3x3': { label:'3x3 (Çaprazlar Dahil)', cells:(function(){var c=[];for(var dr=-1;dr<=1;dr++)for(var dc=-1;dc<=1;dc++)c.push([dr,dc]);return c;})() },
+    '1x2': { label:'1x2 (Sağına Da)', cells:[[0,0],[0,1]] },
+    '1x3': { label:'1x3 (Sağına ve Soluna)', cells:[[0,0],[0,-1],[0,1]] },
+    '3x1': { label:'3x1 (Üstüne ve Altına)', cells:[[0,0],[-1,0],[1,0]] },
+    '4x4': { label:'4x4', cells:(function(){var c=[];for(var dr=0;dr<=3;dr++)for(var dc=0;dc<=3;dc++)c.push([dr,dc]);return c;})() },
+    '5x5': { label:'5x5', cells:(function(){var c=[];for(var dr=-2;dr<=2;dr++)for(var dc=-2;dc<=2;dc++)c.push([dr,dc]);return c;})() }
+  };
+
   function defaultSheet(){
     const skills = DEFAULT_SKILLS.map(([label,cat]) => ({label, category:cat, value:0}));
     skills.push({label:'', category:'', value:0});
@@ -804,6 +871,108 @@
     return (t.statusEffects||[]).some(se => se.effectType==='silence');
   }
 
+  // ---------- Element (yanma/islak/soguk/zehir/elektrik) reaksiyon motoru ----------
+  function rollSaveVsElement(t){
+    if(t.kind==='creature' || true){ /* hem karakter hem yaratik icin gecerli */ }
+    const irade = findSkillValue(t, 'İRADE');
+    const bonus = Math.floor(irade/4);
+    const roll = 1 + Math.floor(Math.random()*4);
+    const total = roll + bonus;
+    return { success: total>=4, roll, bonus, total };
+  }
+
+  function clearElementState(t){ t.elementState = null; }
+
+  function setElementState(t, type, turns, source){
+    t.elementState = { type, turnsLeft: turns==null?2:turns, source: source||'' };
+  }
+
+  // iki element bir arada oldugunda ne olacagini cozer. mevcut = t.elementState.type, gelen = yeni uygulanmaya calisilan element
+  function resolveElementReaction(t, incoming, sourceLabel){
+    const existing = t.elementState ? t.elementState.type : null;
+    if(!existing){
+      setElementState(t, incoming, 2, sourceLabel);
+      logSystemEvent(t.name + ' ' + (RESISTANCE_MATCH[incoming]||incoming) + ' etkisi kazandi (' + sourceLabel + ').');
+      return;
+    }
+    const pair = existing + '+' + incoming;
+    const rev = incoming + '+' + existing;
+
+    function dmgAndClear(amount, resultLabel){
+      const before = t.hp;
+      t.hp = Math.max(0, t.hp - amount);
+      queueFloat(t.id, t.hp - before);
+      clearElementState(t);
+      logSystemEvent(t.name + ': ' + resultLabel + '! ' + amount + ' hasar aldi.');
+    }
+    function stunAndDamage(dmg, resultLabel, newState){
+      const before = t.hp;
+      t.hp = Math.max(0, t.hp - dmg);
+      queueFloat(t.id, t.hp - before);
+      t.statusEffects = t.statusEffects || [];
+      t.statusEffects.push({ id:'se'+Date.now()+Math.floor(Math.random()*999), effectType:'stun', params:{statusName:resultLabel}, remaining:1, source:sourceLabel });
+      if(newState) setElementState(t, newState, 1, resultLabel); else clearElementState(t);
+      logSystemEvent(t.name + ': ' + resultLabel + '! 1 tur sersemledi ve ' + dmg + ' hasar aldi.');
+    }
+
+    if(pair==='islak+yanma' || pair==='yanma+islak'){
+      clearElementState(t);
+      logSystemEvent(t.name + ': Buharlasma! Islaklik ve yanma birbirini gotürdü.');
+      return;
+    }
+    if(pair==='islak+elektrik' || pair==='elektrik+islak'){
+      const dmg = rollDiceExpr('1d3');
+      stunAndDamage(dmg, 'Şoklandı', 'sok');
+      return;
+    }
+    if(pair==='islak+soguk' || pair==='soguk+islak'){
+      const dmg = rollDiceExpr('1d3');
+      stunAndDamage(dmg, 'Dondu', 'donma');
+      return;
+    }
+    if(pair==='yanma+soguk' || pair==='soguk+yanma'){
+      clearElementState(t);
+      setElementState(t, 'islak', 2, 'Erime');
+      logSystemEvent(t.name + ': Eridi, islak hale geldi.');
+      return;
+    }
+    if(pair==='yanma+elektrik' || pair==='elektrik+yanma'){
+      const dmg = rollDiceExpr('1d6');
+      dmgAndClear(dmg, 'Patlama');
+      return;
+    }
+    if(pair==='elektrik+soguk' || pair==='soguk+elektrik'){
+      clearElementState(t);
+      t.statusEffects = t.statusEffects || [];
+      t.statusEffects.push({ id:'se'+Date.now()+Math.floor(Math.random()*999), effectType:'armorBreak', params:{}, remaining:1, source:sourceLabel });
+      logSystemEvent(t.name + ': Zirhi kirildi, bu tur Fiziksel/Buyusel AC yarilandi.');
+      return;
+    }
+    // eslesen bir reaksiyon yoksa (ayni element tekrar geldi gibi), sureyi tazele
+    setElementState(t, incoming, 2, sourceLabel);
+  }
+
+  function applyElementEffect(target, elementType, sourceLabel){
+    if(!target || !elementType) return;
+    const statusLabel = RESISTANCE_MATCH[elementType];
+    if(statusLabel && hasResistance(target, statusLabel)){
+      logSystemEvent(target.name + ' ' + statusLabel + ' etkisine dirençli, hiç etkilenmedi.');
+      return;
+    }
+    const save = rollSaveVsElement(target);
+    if(save.success){
+      logSystemEvent(target.name + ' savunma zarını başarıyla attı (' + save.roll + '+' + save.bonus + '=' + save.total + '), etkilenmedi.');
+      return;
+    }
+    logSystemEvent(target.name + ' savunma zarında başarısız oldu (' + save.roll + '+' + save.bonus + '=' + save.total + ').');
+    resolveElementReaction(target, elementType, sourceLabel);
+  }
+
+  function hasArmorBreak(t){
+    return (t.statusEffects||[]).some(se => se.effectType==='armorBreak');
+  }
+
+
   // Bir eşyada/tur bazlı etkide "Buff/Debuff" olarak tanımlanmış, belirli bir alt-istatistiği
   // (statType) etkileyen tüm kaynakları toplar: kalıcı (kuşanılan eşya) + süreli (statusEffects).
   function collectBuffDebuff(t, statType, matchExtra){
@@ -846,11 +1015,14 @@
     return Math.max(1, level + direnc + bonus + equipBonus);
   }
   function getMaxMp(t){
-    if(t.kind==='creature' && t.sheet && t.sheet.fixedMaxMp != null) return Math.max(0, t.sheet.fixedMaxMp);
+    if(t.kind==='creature' && t.sheet && t.sheet.fixedMaxMp != null) return Math.max(0, t.sheet.fixedMaxMp + collectBuffDebuff(t,'maxManaBoost'));
     const level = (t.sheet && t.sheet.level) || 1;
     const irade = findSkillValue(t, 'İRADE');
     const bonus = (t.sheet && t.sheet.manaBonus) || 0;
-    return Math.max(0, level + irade + bonus);
+    let equipBonus = 0;
+    getEquippedEffects(t).forEach(({eff}) => { if(eff.type==='maxManaBoost') equipBonus += parseInt(eff.params.amount)||0; });
+    equipBonus += collectBuffDebuff(t, 'maxManaBoost');
+    return Math.max(0, level + irade + bonus + equipBonus);
   }
   function getSpeed(t){
     const cevik = findSkillValue(t, 'ÇEVİKLİK');
@@ -860,7 +1032,8 @@
     return Math.max(0, 2 + Math.floor(cevik/2) + equipBonus);
   }
   function getEffectiveAC(t, isMagic){
-    const base = isMagic ? (t.sheet.acMagical!=null?t.sheet.acMagical:5) : (t.sheet.acPhysical!=null?t.sheet.acPhysical:5);
+    let base = isMagic ? (t.sheet.acMagical!=null?t.sheet.acMagical:5) : (t.sheet.acPhysical!=null?t.sheet.acPhysical:5);
+    if(hasArmorBreak(t)) base = Math.floor(base/2);
     let bonus = 0;
     getEquippedEffects(t).forEach(({eff}) => {
       if(eff.type==='acBoost' && ((eff.params.acType==='Büyüsel')===!!isMagic)) bonus += parseInt(eff.params.amount)||0;
@@ -884,8 +1057,9 @@
   let me = { name:'', role:'player', code:'' };
   let session = null; // shared state
   let actingTokenId = null;  // aksiyon menüsünü açan / hedef seçimi bekleyen karakter
-  let actionMode = null;     // null | 'walk' | 'melee' | 'ability'
+  let actionMode = null;     // null | 'walk' | 'melee' | 'ability' | 'item' | 'terrain'
   let pendingAbility = null; // actionMode === 'ability' iken seçilen yetenek
+  let pendingItem = null;    // actionMode === 'item' iken seçilen (hedefe etki eden) eşya
   let currentSheetTokenId = null;
 
   const $ = id => document.getElementById(id);
@@ -905,7 +1079,7 @@
     if(typeof firebase === 'undefined' || !fbDb){ setupError('Veritabanına bağlanılamadı — internet bağlantını kontrol et.'); return; }
     const code = genCode();
     me.name = name; me.code = code; me.role = 'dm'; // oda kuran kişi Zindan Ustası olur
-    const fresh = { code, tokens:[], activeTokenId:null, turnOrder:[], rollLog:[], itemTemplates:[], updatedAt: Date.now() };
+    const fresh = { code, tokens:[], activeTokenId:null, turnOrder:[], rollLog:[], itemTemplates:[], terrain:{}, roundNumber:1, updatedAt: Date.now() };
     try{
       await fbDb.ref('sessions/'+code).set(fresh);
       session = fresh;
@@ -1030,9 +1204,16 @@
 
   function renderStatusBadges(t, info){
     const active = (t.statusEffects||[]);
-    if(active.length===0) return;
+    if(active.length===0 && !t.elementState) return;
     const row = document.createElement('div');
     row.style.display='flex'; row.style.flexWrap='wrap'; row.style.gap='4px'; row.style.marginTop='4px';
+    if(t.elementState){
+      const vis = ELEMENT_VISUALS[t.elementState.type] || {color:'var(--ember-bright)', icon:'⚠️'};
+      const badge = document.createElement('span'); badge.className='item-tag';
+      badge.style.background = vis.color+'26'; badge.style.borderColor = vis.color; badge.style.color = vis.color;
+      badge.textContent = vis.icon + ' ' + (RESISTANCE_MATCH[t.elementState.type]||t.elementState.type) + ' (' + t.elementState.turnsLeft + ' tur)';
+      row.appendChild(badge);
+    }
     active.forEach(se => {
       const def = EFFECT_DEFS[se.effectType];
       let text;
@@ -1103,6 +1284,7 @@
     t.inventory.forEach(i => { if(i.qty == null) i.qty = 1; });
     if(!t.equipment) t.equipment = {};
     if(!t.statusEffects) t.statusEffects = [];
+    if(t.elementState === undefined) t.elementState = null;
     if(!t.kind) t.kind = 'character';
     if(t.inBattle == null) t.inBattle = (t.kind === 'character');
     if(t.hp == null) t.hp = getMaxHp(t);
@@ -1115,6 +1297,8 @@
     if(!session.rollLog) session.rollLog = [];
     if(!session.turnOrder) session.turnOrder = [];
     if(!session.itemTemplates) session.itemTemplates = [];
+    if(!session.terrain) session.terrain = {};
+    if(!session.roundNumber) session.roundNumber = 1;
     renderTurnBanner();
     renderGrid();
     renderCharList();
@@ -1131,8 +1315,21 @@
     const active = session.tokens.find(t=>t.id===session.activeTokenId);
     const canEnd = active && (me.role==='dm' || active.owner===me.name);
     $('btn-end-turn').style.display = canEnd ? 'block' : 'none';
+    $('btn-paint-terrain').style.display = me.role==='dm' ? 'block' : 'none';
   }
   $('btn-end-turn').onclick = endTurn;
+
+  $('btn-paint-terrain').onclick = () => {
+    if(actionMode==='terrain'){ cancelActionMode(); return; }
+    const opts = TERRAIN_TYPES.map(td => ({ label: '<span style="color:'+td.color+'">●</span> '+esc(td.label), value: td }));
+    opts.push({ label: '✕ Temizle (Normal Zemin)', value: null });
+    openPicker('Zemin Türü Seç', opts, (def) => {
+      terrainPaintDef = def;
+      actingTokenId = null;
+      actionMode = 'terrain';
+      renderGrid();
+    }, '');
+  };
 
   function renderRollLog(){
     const wrap = $('roll-log');
@@ -1142,6 +1339,10 @@
       chip.className = 'roll-chip' + (r.roll===20?' crit20':'') + (r.roll===1?' crit1':'');
       if(r.system){
         chip.innerHTML = '✨ ' + esc(r.text);
+      } else if(r.aoe){
+        const label = r.skillLabel ? (' ('+r.skillLabel+')') : '';
+        const outcome = r.hit ? ('İSABET: ' + esc(r.targetName)) : 'ISKALADI';
+        chip.innerHTML = esc(r.charName) + ': <b>' + r.roll + (r.bonus?(' +'+r.bonus):'') + ' = ' + r.total + '</b>' + esc(label) + ' — ' + outcome;
       } else if(r.combat){
         const label = r.skillLabel ? (' ('+r.skillLabel+')') : '';
         const outcome = r.hit ? ('İSABET · '+r.dmg+' hasar') : 'ISKALADI';
@@ -1181,12 +1382,24 @@
     if(link) link.onclick = resetTurnOrder;
   }
 
+  function decayTerrain(){
+    const round = session.roundNumber || 1;
+    Object.keys(session.terrain||{}).forEach(key => {
+      const cell = session.terrain[key];
+      if(!cell || cell.manual) return;
+      if(round - (cell.createdRound||round) >= 2){
+        delete session.terrain[key];
+      }
+    });
+  }
+
   async function resetTurnOrder(){
     if(me.role !== 'dm') return;
     const participants = session.tokens.filter(t => t.kind!=='creature' || t.inBattle);
     const sorted = participants.slice().sort((a,b) => computeInitiative(b) - computeInitiative(a));
     session.turnOrder = sorted.map(t=>t.id);
     session.activeTokenId = session.turnOrder[0] || null;
+    session.roundNumber = 1;
     const newActive = session.tokens.find(t=>t.id===session.activeTokenId);
     if(newActive) await tickStatusEffects(newActive);
     await pushRemote();
@@ -1202,41 +1415,117 @@
     const active = session.tokens.find(t=>t.id===session.activeTokenId);
     if(!(me.role==='dm' || (active && active.owner===me.name))) return;
     const curIdx = activeIds.indexOf(session.activeTokenId);
-    session.activeTokenId = activeIds[(curIdx+1) % activeIds.length];
+    const nextIdx = (curIdx+1) % activeIds.length;
+    if(nextIdx <= curIdx || curIdx===-1){
+      session.roundNumber = (session.roundNumber||1) + 1;
+      decayTerrain();
+    }
+    session.activeTokenId = activeIds[nextIdx];
     const newActive = session.tokens.find(t=>t.id===session.activeTokenId);
     if(newActive) await tickStatusEffects(newActive);
     await pushRemote();
     renderAll();
   }
 
-  function renderGrid(){
-    const grid = $('grid');
-    grid.querySelectorAll('.token, .cell-range').forEach(el => el.remove());
+  function terrainKeyForElement(elementType){
+    const def = TERRAIN_TYPES.find(t => t.element===elementType);
+    return def ? def.key : null;
+  }
 
-    const actor = session.tokens.find(t => t.id === actingTokenId);
-
-    // walk mode: highlight reachable empty cells
-    if(actor && actionMode==='walk' && canControl(actor)){
-      for(let r=0;r<ROWS;r++){
-        for(let c=0;c<COLS;c++){
-          const dist = Math.max(Math.abs(r-actor.row), Math.abs(c-actor.col));
-          const occupied = session.tokens.some(t => t.row===r && t.col===c && t.id!==actor.id && (t.kind!=='creature' || t.inBattle));
-          if(dist>0 && dist<=getSpeed(actor) && !occupied){
-            const cell = document.createElement('div');
-            cell.className = 'cell-range';
-            cell.style.left = (c*CELL)+'px'; cell.style.top = (r*CELL)+'px';
-            cell.style.width = CELL+'px'; cell.style.height = CELL+'px';
-            cell.onclick = () => moveToken(actor.id, r, c);
-            grid.appendChild(cell);
+  function computeReachableCells(actor){
+    const budget = getSpeed(actor);
+    const startKey = actor.row+','+actor.col;
+    const costSoFar = {}; costSoFar[startKey] = 0;
+    const queue = [{r:actor.row, c:actor.col, cost:0}];
+    const reachable = {};
+    while(queue.length){
+      const cur = queue.shift();
+      for(let dr=-1; dr<=1; dr++){
+        for(let dc=-1; dc<=1; dc++){
+          if(dr===0 && dc===0) continue;
+          const nr = cur.r+dr, nc = cur.c+dc;
+          if(nr<0 || nr>=ROWS || nc<0 || nc>=COLS) continue;
+          const occupied = session.tokens.some(t => t.row===nr && t.col===nc && t.id!==actor.id && (t.kind!=='creature' || t.inBattle));
+          if(occupied) continue;
+          const terr = session.terrain[nr+','+nc];
+          const cellCost = (terr && terr.type==='mor') ? 2 : 1;
+          const newCost = cur.cost + cellCost;
+          const key = nr+','+nc;
+          if(newCost<=budget && (costSoFar[key]===undefined || newCost<costSoFar[key])){
+            costSoFar[key] = newCost;
+            reachable[key] = true;
+            queue.push({r:nr, c:nc, cost:newCost});
           }
         }
       }
     }
+    return reachable;
+  }
 
-    // melee/ability mode: figure out which tokens are valid targets, and tint the whole range area
-    let targetRange = 0, isAbilityMode = false;
+  function renderGrid(){
+    const grid = $('grid');
+    grid.querySelectorAll('.token, .cell-range, .terrain-cell').forEach(el => el.remove());
+
+    // zemin (terrain) alt katmani her zaman gosterilir
+    Object.keys(session.terrain||{}).forEach(key => {
+      const cellData = session.terrain[key];
+      if(!cellData || !cellData.type) return;
+      const parts = key.split(',');
+      const r = parseInt(parts[0]), c = parseInt(parts[1]);
+      const def = terrainDef(cellData.type);
+      if(!def) return;
+      const el = document.createElement('div');
+      el.className = 'terrain-cell';
+      el.style.left = (c*CELL)+'px'; el.style.top = (r*CELL)+'px';
+      el.style.width = CELL+'px'; el.style.height = CELL+'px';
+      el.style.background = def.color + '4d';
+      el.style.borderColor = def.color;
+      el.title = def.label;
+      if(actionMode==='terrain'){
+        el.style.cursor = 'pointer';
+        el.onclick = () => paintTerrainCell(r,c);
+      }
+      grid.appendChild(el);
+    });
+
+    // zemin boyama modu: bos kareler de tiklanabilir olsun
+    if(actionMode==='terrain' && me.role==='dm'){
+      for(let r=0;r<ROWS;r++){
+        for(let c=0;c<COLS;c++){
+          const key = r+','+c;
+          if(session.terrain[key] && session.terrain[key].type) continue;
+          const cell = document.createElement('div');
+          cell.className = 'cell-range';
+          cell.style.left = (c*CELL)+'px'; cell.style.top = (r*CELL)+'px';
+          cell.style.width = CELL+'px'; cell.style.height = CELL+'px';
+          cell.onclick = () => paintTerrainCell(r,c);
+          grid.appendChild(cell);
+        }
+      }
+    }
+
+    const actor = session.tokens.find(t => t.id === actingTokenId);
+
+    // walk mode: agirlikli (mor kare 2 maliyet) ulasilabilir kareler
+    if(actor && actionMode==='walk' && canControl(actor)){
+      const reach = computeReachableCells(actor);
+      Object.keys(reach).forEach(key => {
+        const parts = key.split(',');
+        const r = parseInt(parts[0]), c = parseInt(parts[1]);
+        const cell = document.createElement('div');
+        cell.className = 'cell-range';
+        cell.style.left = (c*CELL)+'px'; cell.style.top = (r*CELL)+'px';
+        cell.style.width = CELL+'px'; cell.style.height = CELL+'px';
+        cell.onclick = () => moveToken(actor.id, r, c);
+        grid.appendChild(cell);
+      });
+    }
+
+    // melee/ability/item mode: hedef menzili tum alan olarak boyanir
+    let targetRange = 0, isAbilityMode = false, isItemMode = false;
     if(actor && actionMode==='melee'){ targetRange = actor.sheet.meleeRange || 1; }
     if(actor && actionMode==='ability' && pendingAbility){ targetRange = pendingAbility.range || 1; isAbilityMode = true; }
+    if(actor && actionMode==='item' && pendingItem){ targetRange = pendingItem.range || 1; isItemMode = true; }
 
     if(actor && targetRange>0){
       for(let r=0;r<ROWS;r++){
@@ -1244,9 +1533,16 @@
           const dist = Math.max(Math.abs(r-actor.row), Math.abs(c-actor.col));
           if(dist>0 && dist<=targetRange){
             const cell = document.createElement('div');
-            cell.className = 'cell-range' + (isAbilityMode ? ' ability-tint' : ' melee-tint');
+            cell.className = 'cell-range' + ((isAbilityMode||isItemMode) ? ' ability-tint' : ' melee-tint');
             cell.style.left = (c*CELL)+'px'; cell.style.top = (r*CELL)+'px';
             cell.style.width = CELL+'px'; cell.style.height = CELL+'px';
+            if(isAbilityMode){
+              cell.style.cursor = 'pointer';
+              cell.onclick = () => resolveAbilityAtCell(actor, pendingAbility, r, c);
+            } else if(isItemMode){
+              cell.style.cursor = 'pointer';
+              cell.onclick = () => resolveItemAtCell(actor, pendingItem, r, c);
+            }
             grid.appendChild(cell);
           }
         }
@@ -1263,7 +1559,7 @@
       el.className = 'token'
         + (t.id===actingTokenId && (actionMode==='walk') ? ' selected':'')
         + (t.id===session.activeTokenId ? ' active-turn':'')
-        + (isTarget ? ' can-target' + (isAbilityMode?' ability-target':'') : '');
+        + (isTarget ? ' can-target' + ((isAbilityMode||isItemMode)?' ability-target':'') : '');
       el.style.width = (CELL-8)+'px'; el.style.height = (CELL-8)+'px';
       el.style.left = (t.col*CELL+4)+'px'; el.style.top = (t.row*CELL+4)+'px';
       const portrait = t.sheet && t.sheet.portrait;
@@ -1274,7 +1570,15 @@
         el.style.background = t.color;
         el.textContent = t.name.slice(0,2).toUpperCase();
       }
-      el.title = t.name;
+      el.title = t.name + (t.elementState ? (' - ' + (RESISTANCE_MATCH[t.elementState.type]||t.elementState.type)) : '');
+      if(t.elementState){
+        const vis = ELEMENT_VISUALS[t.elementState.type] || {color:'#e2632a', icon:'⚠️'};
+        el.style.boxShadow = '0 0 0 2px ' + vis.color + ', 0 0 10px 2px ' + vis.color + '99';
+        const badge = document.createElement('div');
+        badge.className = 'element-badge';
+        badge.textContent = vis.icon;
+        el.appendChild(badge);
+      }
       const bar = document.createElement('div');
       bar.className = 'hp-bar-mini';
       const fill = document.createElement('i');
@@ -1302,7 +1606,15 @@
       hint.style.display = 'none';
     } else if(actionMode==='ability'){
       banner.classList.add('show');
-      $('mode-banner-text').textContent = (pendingAbility ? pendingAbility.name || 'Yetenek' : 'Yetenek') + ': hedefine dokun';
+      $('mode-banner-text').textContent = (pendingAbility ? pendingAbility.name || 'Yetenek' : 'Yetenek') + ': hedef kareye dokun';
+      hint.style.display = 'none';
+    } else if(actionMode==='item'){
+      banner.classList.add('show');
+      $('mode-banner-text').textContent = (pendingItem ? pendingItem.name : 'Eşya') + ': hedef kareye dokun';
+      hint.style.display = 'none';
+    } else if(actionMode==='terrain'){
+      banner.classList.add('show');
+      $('mode-banner-text').textContent = 'Zemin Boya (' + (terrainPaintDef ? terrainPaintDef.label : '') + '): boyamak istediğin kareye dokun';
       hint.style.display = 'none';
     } else {
       banner.classList.remove('show');
@@ -1313,13 +1625,14 @@
 
   $('mode-cancel').onclick = () => { cancelActionMode(); };
   function cancelActionMode(){
-    actionMode = null; actingTokenId = null; pendingAbility = null;
+    actionMode = null; actingTokenId = null; pendingAbility = null; pendingItem = null; terrainPaintDef = null;
     renderGrid();
   }
 
   function onTokenTap(t, isTarget){
     if(actionMode==='melee' && isTarget){ resolveMeleeAttack(session.tokens.find(x=>x.id===actingTokenId), t); return; }
-    if(actionMode==='ability' && isTarget && pendingAbility){ resolveAbility(session.tokens.find(x=>x.id===actingTokenId), t, pendingAbility); return; }
+    if(actionMode==='ability' && isTarget && pendingAbility){ resolveAbilityAtCell(session.tokens.find(x=>x.id===actingTokenId), pendingAbility, t.row, t.col); return; }
+    if(actionMode==='item' && isTarget && pendingItem){ resolveItemAtCell(session.tokens.find(x=>x.id===actingTokenId), pendingItem, t.row, t.col); return; }
     if(actionMode){ return; } // bir mod açıkken hedef olmayan bir karaktere dokunmayı yoksay
     if(!canControl(t)) return;
     openActionMenu(t);
@@ -1329,14 +1642,35 @@
     return me.role === 'dm' || t.owner === me.name;
   }
 
+  let terrainPaintDef = null;
+  async function paintTerrainCell(row, col){
+    if(me.role !== 'dm') return;
+    const key = row+','+col;
+    if(terrainPaintDef === null){
+      delete session.terrain[key];
+    } else {
+      session.terrain[key] = { type: terrainPaintDef.key, manual:true, createdRound: session.roundNumber };
+    }
+    await pushRemote();
+    renderGrid();
+  }
+
   async function moveToken(id, row, col){
     const t = session.tokens.find(x=>x.id===id);
     if(!t) return;
     t.row = row; t.col = col;
     actionMode = null; actingTokenId = null;
+    const terr = session.terrain[row+','+col];
+    if(terr && terr.type){
+      const def = terrainDef(terr.type);
+      if(def && def.element){
+        applyElementEffect(t, def.element, def.label);
+      }
+    }
     await pushRemote();
-    renderGrid();
+    renderAll();
     flashToken(id);
+    flushFloatingNumbers();
   }
 
   function flashToken(id){
@@ -1423,9 +1757,16 @@
 
   function openItemPicker(t){
     const items = (t.inventory||[]).filter(i => (i.tag||'').trim().toLocaleUpperCase('tr') === 'KULLANILABİLİR');
-    const opts = items.map(i => ({ label: '<b>'+esc(i.name)+'</b>' + ((i.qty||1)>1 ? ' <span class="n">×'+i.qty+'</span>' : ''), value: i }));
+    const opts = items.map(i => ({ label: '<b>'+esc(i.name)+'</b>' + ((i.qty||1)>1 ? ' <span class="n">×'+i.qty+'</span>' : '') + (i.targetMode==='target' ? ' <span class="n">(Hedefe Etki)</span>' : ''), value: i }));
     openPicker('Eşya Kullan', opts, (item) => {
-      resolveItemUse(t, item);
+      if(item.targetMode === 'target'){
+        pendingItem = item;
+        actionMode = 'item';
+        actingTokenId = t.id;
+        renderGrid();
+      } else {
+        resolveItemUse(t, item);
+      }
     }, 'Kullanılabilir etiketli eşyası yok.');
     actingTokenId = t.id;
   }
@@ -1537,6 +1878,7 @@
     await pushRemote();
     renderCharList(); renderGrid();
     if(stat==='hp'){ queueFloat(t.id, t.hp - before); flushFloatingNumbers(); checkDeath(t); }
+    else { queueFloat(t.id, t.mp - before, 'mp'); flushFloatingNumbers(); }
   }
 
   async function setStatExact(id, stat, value){
@@ -1548,6 +1890,7 @@
     await pushRemote();
     renderCharList(); renderGrid();
     if(stat==='hp'){ queueFloat(t.id, t.hp - before); flushFloatingNumbers(); checkDeath(t); }
+    else { queueFloat(t.id, t.mp - before, 'mp'); flushFloatingNumbers(); }
   }
 
   function checkDeath(t){
@@ -1560,12 +1903,12 @@
 
   // ---------- Floating heal/damage numbers ----------
   let pendingFloats = [];
-  function queueFloat(tokenId, delta){ if(delta) pendingFloats.push({tokenId, delta}); }
+  function queueFloat(tokenId, delta, kind){ if(delta) pendingFloats.push({tokenId, delta, kind: kind||'hp'}); }
   function flushFloatingNumbers(){
     const q = pendingFloats; pendingFloats = [];
-    q.forEach(f => showFloatingNumber(f.tokenId, f.delta));
+    q.forEach(f => showFloatingNumber(f.tokenId, f.delta, f.kind));
   }
-  function showFloatingNumber(tokenId, delta){
+  function showFloatingNumber(tokenId, delta, kind){
     if(!delta) return;
     const t = session.tokens.find(x=>x.id===tokenId);
     if(!t) return;
@@ -1576,12 +1919,15 @@
       if(parseInt(el.style.left)===t.col*CELL+4 && parseInt(el.style.top)===t.row*CELL+4) foundEl = el;
     });
     if(!foundEl) return; // Aksiyon sekmesinde görünmüyorsa animasyonu atla
+    const isMana = kind==='mp';
     const isHeal = delta > 0;
-    foundEl.classList.add(isHeal ? 'token-heal-glow' : 'token-damage-glow');
-    setTimeout(() => foundEl.classList.remove(isHeal ? 'token-heal-glow' : 'token-damage-glow'), 550);
+    const glowClass = isMana ? 'token-mana-glow' : (isHeal ? 'token-heal-glow' : 'token-damage-glow');
+    const numClass = isMana ? 'mana' : (isHeal ? 'heal' : 'dmg');
+    foundEl.classList.add(glowClass);
+    setTimeout(() => foundEl.classList.remove(glowClass), 550);
     const float = document.createElement('div');
-    float.className = 'float-number ' + (isHeal ? 'heal' : 'dmg');
-    float.textContent = (isHeal ? '+' : '') + delta;
+    float.className = 'float-number ' + numClass;
+    float.textContent = (delta>0 ? '+' : '') + delta;
     float.style.left = foundEl.style.left;
     float.style.top = foundEl.style.top;
     grid.appendChild(float);
@@ -2034,6 +2380,7 @@
       addItemToInventory(t, {
         id:'i'+Date.now()+Math.floor(Math.random()*999),
         name: tpl.name, tag: tpl.type, quality: tpl.quality,
+        targetMode: tpl.targetMode||'self', range: tpl.range||1, shape: tpl.shape||'1x1',
         effects: JSON.parse(JSON.stringify(tpl.effects||[]))
       });
       pushRemote();
@@ -2233,6 +2580,23 @@
       sw.onclick = async () => { tpl.quality = q.key; renderItemEditor(); await pushRemote(); };
       qRow.appendChild(sw);
     });
+
+    const tmSel = $('ie-target-mode');
+    tmSel.value = tpl.targetMode || 'self';
+    tmSel.onchange = async () => { tpl.targetMode = tmSel.value; renderItemEditor(); await pushRemote(); };
+    $('ie-target-range-row').style.display = (tpl.targetMode==='target') ? 'flex' : 'none';
+
+    $('ie-range').value = tpl.range || 1;
+    $('ie-range').oninput = debounce(() => { tpl.range = Math.max(1, parseInt($('ie-range').value)||1); pushRemote(); }, 350);
+
+    const shapeSel = $('ie-shape');
+    shapeSel.innerHTML = '';
+    Object.keys(AOE_SHAPES).forEach(key => {
+      const o = document.createElement('option'); o.value = key; o.textContent = AOE_SHAPES[key].label;
+      if((tpl.shape||'1x1')===key) o.selected = true;
+      shapeSel.appendChild(o);
+    });
+    shapeSel.onchange = async () => { tpl.shape = shapeSel.value; await pushRemote(); };
 
     const effWrap = $('ie-effects');
     effWrap.innerHTML = '';
@@ -2474,30 +2838,63 @@
     flushFloatingNumbers();
   }
 
-  async function resolveAbility(actor, target, ability){
-    if(!actor || !target || !ability) return;
+  async function resolveAbilityAtCell(actor, ability, centerRow, centerCol){
+    if(!actor || !ability) return;
     if((actor.mp||0) < (ability.manaCost||0)){ alert('Yetersiz mana!'); actionMode=null; actingTokenId=null; pendingAbility=null; renderGrid(); return; }
+    if(ability.manaCost) queueFloat(actor.id, -(ability.manaCost||0), 'mp');
     actor.mp = Math.max(0, actor.mp - (ability.manaCost||0));
+
     const skillVal = findSkillValue(actor, ability.skillLabel||'');
     const roll = 1 + Math.floor(Math.random()*20);
     const total = roll + skillVal;
     const isMagic = ability.dmgType === 'buyusel';
-    const ac = getEffectiveAC(target, isMagic);
-    const hit = total >= ac;
-    let dmg = hit ? Math.max(0, getEffectiveDamageBonus(actor, isMagic, parseInt(ability.damage)||0)) : 0;
-    if(hit) applyDamageWithExecute(actor, target, dmg, isMagic);
+    const shapeDef = AOE_SHAPES[ability.shape] || AOE_SHAPES['1x1'];
+    const cells = shapeDef.cells
+      .map(off => [centerRow+off[0], centerCol+off[1]])
+      .filter(rc => rc[0]>=0 && rc[0]<ROWS && rc[1]>=0 && rc[1]<COLS);
+
+    const elementType = SPELL_SCHOOL_ELEMENT[ability.spellSchool];
+    if(elementType){
+      const terrainKey = terrainKeyForElement(elementType);
+      if(terrainKey){
+        cells.forEach(rc => {
+          const key = rc[0]+','+rc[1];
+          const existing = session.terrain[key];
+          if(existing && existing.manual) return; // DM elle sabitlemiş, değiştirme
+          session.terrain[key] = { type: terrainKey, manual:false, createdRound: session.roundNumber };
+        });
+      }
+    }
+
+    let hitAny = false;
+    const hitNames = [];
+    cells.forEach(rc => {
+      const targets = session.tokens.filter(x => (x.kind!=='creature'||x.inBattle) && x.row===rc[0] && x.col===rc[1] && x.id!==actor.id);
+      targets.forEach(target => {
+        const ac = getEffectiveAC(target, isMagic);
+        const hit = total >= ac;
+        const dmg = hit ? Math.max(0, getEffectiveDamageBonus(actor, isMagic, parseInt(ability.damage)||0)) : 0;
+        if(hit){
+          applyDamageWithExecute(actor, target, dmg, isMagic);
+          applyOnHitPassives(actor, target, dmg, ability.dmgType);
+          if(elementType) applyElementEffect(target, elementType, ability.name || 'yetenek');
+          hitAny = true; hitNames.push(target.name);
+        }
+        checkDeath(target);
+      });
+    });
 
     const entry = {
-      id:'r'+Date.now()+Math.floor(Math.random()*999), combat:true,
-      charName:actor.name, targetName:target.name, skillLabel: ability.skillLabel || ability.name,
-      roll, bonus:skillVal, total, ac, hit, dmg, atkType: ability.dmgType, abilityName: ability.name, ts:Date.now()
+      id:'r'+Date.now()+Math.floor(Math.random()*999), combat:true, aoe:true,
+      charName:actor.name, targetName: hitNames.length ? hitNames.join(', ') : '(alan)',
+      skillLabel: ability.skillLabel || ability.name,
+      roll, bonus:skillVal, total, hit:hitAny, atkType: ability.dmgType, abilityName: ability.name, ts:Date.now()
     };
     logRoll(entry);
-    if(hit) applyOnHitPassives(actor, target, dmg, ability.dmgType);
+
     actionMode = null; actingTokenId = null; pendingAbility = null;
     await pushRemote();
     renderAll();
-    checkDeath(target);
     flushFloatingNumbers();
   }
 
@@ -2528,6 +2925,15 @@
           actor.hp = Math.min(getMaxHp(actor), actor.hp + heal);
           queueFloat(actor.id, actor.hp - before);
           logSystemEvent(actor.name + ' can çalarak ' + heal + ' can kazandı.');
+        }
+      }
+      if(eff.type==='manasteal' && dmg>0){
+        const stolen = Math.round(dmg * (parseFloat(eff.params.percent)||0)/100);
+        if(stolen>0){
+          const before = actor.mp;
+          actor.mp = Math.min(getMaxMp(actor), actor.mp + stolen);
+          queueFloat(actor.id, actor.mp - before, 'mp');
+          logSystemEvent(actor.name + ' mana çalarak ' + stolen + ' mana kazandı.');
         }
       }
     });
@@ -2576,6 +2982,23 @@
         logSystemEvent(target.name + ' ' + sourceName + ' ile maksimum canı ' + amt + ' arttı.');
         break;
       }
+      case 'manaHeal': {
+        const amt = rollDiceExpr(effect.params.amount);
+        const before = target.mp;
+        target.mp = Math.min(getMaxMp(target), target.mp + amt);
+        queueFloat(target.id, target.mp - before, 'mp');
+        logSystemEvent(target.name + ' ' + sourceName + ' ile ' + amt + ' mana yeniledi.');
+        break;
+      }
+      case 'maxManaBoost': {
+        const amt = parseInt(effect.params.amount)||0;
+        target.sheet.manaBonus = (target.sheet.manaBonus||0) + amt;
+        const before = target.mp;
+        target.mp = Math.min(getMaxMp(target), target.mp + amt);
+        queueFloat(target.id, target.mp - before, 'mp');
+        logSystemEvent(target.name + ' ' + sourceName + ' ile maksimum manası ' + amt + ' arttı.');
+        break;
+      }
       case 'cleanse': {
         const which = (effect.params.effectType||'').trim().toLocaleUpperCase('tr');
         if(!which || which.indexOf('HEP') === 0){
@@ -2615,6 +3038,13 @@
               const before = target.hp;
               target.hp = Math.max(0, Math.min(getMaxHp(target), target.hp + signed));
               queueFloat(target.id, target.hp - before);
+              break;
+            }
+            case 'maxManaBoost': {
+              target.sheet.manaBonus = (target.sheet.manaBonus||0) + signed;
+              const before = target.mp;
+              target.mp = Math.max(0, Math.min(getMaxMp(target), target.mp + signed));
+              queueFloat(target.id, target.mp - before, 'mp');
               break;
             }
           }
@@ -2679,6 +3109,25 @@
       else logSystemEvent((EFFECT_DEFS[se.effectType]||{}).label + ' etkisi sona erdi: ' + t.name);
     }
     t.statusEffects = stillActive;
+
+    if(t.elementState){
+      const type = t.elementState.type;
+      const resistLabel = RESISTANCE_MATCH[type];
+      const resistant = resistLabel && hasResistance(t, resistLabel);
+      if(!resistant && (type==='yanma' || type==='zehir')){
+        const dmg = rollDiceExpr('1d2');
+        const before = t.hp;
+        t.hp = Math.max(0, t.hp - dmg);
+        queueFloat(t.id, t.hp - before);
+        logSystemEvent(t.name + ' ' + (type==='yanma'?'yanma':'zehir') + ' etkisiyle ' + dmg + ' hasar aldı.');
+      }
+      t.elementState.turnsLeft = (t.elementState.turnsLeft==null?2:t.elementState.turnsLeft) - 1;
+      if(t.elementState.turnsLeft <= 0){
+        logSystemEvent(t.name + ' üzerindeki ' + (RESISTANCE_MATCH[type]||type) + ' etkisi sona erdi.');
+        t.elementState = null;
+      }
+    }
+
     checkDeath(t);
   }
 
@@ -2715,6 +3164,43 @@
     actingTokenId = null;
     await pushRemote();
     renderAll();
+  }
+
+  async function resolveItemAtCell(actor, item, centerRow, centerCol){
+    if(!actor || !item) return;
+    if((item.qty||1) > 1){
+      item.qty -= 1;
+    } else {
+      actor.inventory = (actor.inventory||[]).filter(i => i.id !== item.id);
+    }
+
+    const shapeDef = AOE_SHAPES[item.shape] || AOE_SHAPES['1x1'];
+    const cells = shapeDef.cells
+      .map(off => [centerRow+off[0], centerCol+off[1]])
+      .filter(rc => rc[0]>=0 && rc[0]<ROWS && rc[1]>=0 && rc[1]<COLS);
+
+    const hitNames = [];
+    cells.forEach(rc => {
+      const targets = session.tokens.filter(x => (x.kind!=='creature'||x.inBattle) && x.row===rc[0] && x.col===rc[1]);
+      targets.forEach(target => {
+        applyItemEffectsOnUse(target, item);
+        hitNames.push(target.name);
+      });
+    });
+
+    const entry = {
+      id:'r'+Date.now()+Math.floor(Math.random()*999),
+      charName:actor.name, skillLabel:null, roll:0, bonus:0, total:0, ts:Date.now(),
+      itemUse:true, itemName: item.name + (hitNames.length ? (' → '+hitNames.join(', ')) : ' (hedef yok)')
+    };
+    session.rollLog = session.rollLog || [];
+    session.rollLog.unshift(entry);
+    session.rollLog = session.rollLog.slice(0, 15);
+
+    actionMode = null; actingTokenId = null; pendingItem = null;
+    await pushRemote();
+    renderAll();
+    flushFloatingNumbers();
   }
 
   function logRoll(entry){
@@ -2859,7 +3345,7 @@
         if((ab.dmgType||'fiziksel')===v) o.selected = true;
         typeSel.appendChild(o);
       });
-      typeSel.onchange = () => { ab.dmgType = typeSel.value; pushRemote(); };
+      typeSel.onchange = () => { ab.dmgType = typeSel.value; renderAbilitiesList(t, editable); pushRemote(); };
 
       const skillSel = document.createElement('select'); skillSel.disabled = !editable;
       const noneOpt = document.createElement('option'); noneOpt.value=''; noneOpt.textContent='Özellik seç';
@@ -2873,6 +3359,30 @@
 
       row2.appendChild(typeSel); row2.appendChild(skillSel);
       card.appendChild(row2);
+
+      if((ab.dmgType||'fiziksel')==='buyusel'){
+        const schoolLbl = document.createElement('label'); schoolLbl.className='effect-param-label'; schoolLbl.textContent='Büyü Türü';
+        card.appendChild(schoolLbl);
+        const schoolSel = document.createElement('select'); schoolSel.disabled = !editable;
+        SPELL_SCHOOLS.forEach(sc => {
+          const o = document.createElement('option'); o.value = sc; o.textContent = sc;
+          if((ab.spellSchool||'Diğer')===sc) o.selected = true;
+          schoolSel.appendChild(o);
+        });
+        schoolSel.onchange = () => { ab.spellSchool = schoolSel.value; pushRemote(); };
+        card.appendChild(schoolSel);
+      }
+
+      const shapeLbl = document.createElement('label'); shapeLbl.className='effect-param-label'; shapeLbl.textContent='Etki Alanı';
+      card.appendChild(shapeLbl);
+      const shapeSel = document.createElement('select'); shapeSel.disabled = !editable;
+      Object.keys(AOE_SHAPES).forEach(key => {
+        const o = document.createElement('option'); o.value = key; o.textContent = AOE_SHAPES[key].label;
+        if((ab.shape||'1x1')===key) o.selected = true;
+        shapeSel.appendChild(o);
+      });
+      shapeSel.onchange = () => { ab.shape = shapeSel.value; pushRemote(); };
+      card.appendChild(shapeSel);
 
       if(editable){
         const rm = document.createElement('button');
@@ -2888,7 +3398,7 @@
     const t = getSheetToken(); if(!t) return;
     t.sheet.abilities.push({
       id:'ab'+Date.now()+Math.floor(Math.random()*999),
-      name:'', desc:'', manaCost:1, range:1, damage:1, dmgType:'fiziksel', skillLabel:''
+      name:'', desc:'', manaCost:1, range:1, damage:1, dmgType:'fiziksel', skillLabel:'', shape:'1x1', spellSchool:'Diğer'
     });
     renderAbilitiesList(t, true);
     pushRemote();
