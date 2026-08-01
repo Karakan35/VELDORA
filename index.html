@@ -1638,7 +1638,8 @@
       for(let r=0;r<ROWS;r++){
         for(let c=0;c<COLS;c++){
           const dist = Math.max(Math.abs(r-actor.row), Math.abs(c-actor.col));
-          if(dist>0 && dist<=targetRange){
+          const selfOk = (isAbilityMode || isItemMode) && dist===0;
+          if((dist>0 && dist<=targetRange) || selfOk){
             const cell = document.createElement('div');
             cell.className = 'cell-range' + ((isAbilityMode||isItemMode) ? ' ability-tint' : ' melee-tint');
             cell.style.left = (c*CELL)+'px'; cell.style.top = (r*CELL)+'px';
@@ -1659,9 +1660,10 @@
     session.tokens.filter(t => t.kind!=='creature' || t.inBattle).forEach(t => {
       const el = document.createElement('div');
       let isTarget = false;
-      if(actor && targetRange>0 && t.id!==actor.id){
+      if(actor && targetRange>0){
         const dist = Math.max(Math.abs(t.row-actor.row), Math.abs(t.col-actor.col));
-        isTarget = dist<=targetRange;
+        const selfOk = (isAbilityMode || isItemMode) && t.id===actor.id;
+        isTarget = selfOk || (t.id!==actor.id && dist<=targetRange);
       }
       el.className = 'token'
         + (t.id===actingTokenId && (actionMode==='walk') ? ' selected':'')
@@ -3030,20 +3032,41 @@
 
     const effects = (ability.effects||[]).filter(e => e && e.type && e.type!=='none');
     const hasDamageEffect = effects.some(e => e.type==='damage');
+    const isAoEShape = (ability.shape||'1x1') !== '1x1';
 
     let hitAny = false;
     const hitNames = [];
     cells.forEach(rc => {
-      const targets = session.tokens.filter(x => (x.kind!=='creature'||x.inBattle) && x.row===rc[0] && x.col===rc[1] && x.id!==actor.id);
+      const targets = session.tokens.filter(x => (x.kind!=='creature'||x.inBattle) && x.row===rc[0] && x.col===rc[1]);
       targets.forEach(target => {
-        const landed = hasDamageEffect ? (total >= getEffectiveAC(target, isMagic)) : true;
+        // Alan etkili (AoE) hasar her zaman isabet eder — tıpkı gerçek bir fireball gibi, alandaki herkes hasar alır.
+        // Tekli hedef (1x1) saldırılar hâlâ normal isabet zarı (vs AC) gerektirir.
+        const landed = (hasDamageEffect && !isAoEShape) ? (total >= getEffectiveAC(target, isMagic)) : true;
         if(landed){
           effects.forEach(eff => {
             if(eff.type==='damage'){
-              const dmg = Math.max(0, getEffectiveDamageBonus(actor, isMagic, rollDiceExpr(eff.params.amount)));
-              applyDamageWithExecute(actor, target, dmg, isMagic);
-              applyOnHitPassives(actor, target, dmg, ability.dmgType);
+              let doDamage = true;
+              if(isAoEShape){
+                // Hasar için 1d4'lük element kurtarması değil, saldırganın zarına karşı kontrollü bir zar atılır:
+                // fiziksel hasarsa Direnç, büyüselse İrade zarı. Savunanın toplamı saldırganınkinden büyükse hasar almaz.
+                const defenseStatLabel = isMagic ? 'İRADE' : 'DİRENÇ';
+                const defenseStatVal = findSkillValue(target, defenseStatLabel);
+                const defenseRoll = 1 + Math.floor(Math.random()*20);
+                const defenseTotal = defenseRoll + defenseStatVal;
+                if(defenseTotal > total){
+                  doDamage = false;
+                  logSystemEvent(target.name + ' (' + (isMagic?'İrade':'Direnç') + ' ' + defenseRoll + '+' + defenseStatVal + '=' + defenseTotal + ') saldırı zarını (' + total + ') aştı, hasar almadı.');
+                } else {
+                  logSystemEvent(target.name + ' savunması yetersiz kaldı (' + defenseTotal + ' vs ' + total + '), hasar aldı.');
+                }
+              }
+              if(doDamage){
+                const dmg = Math.max(0, getEffectiveDamageBonus(actor, isMagic, rollDiceExpr(eff.params.amount)));
+                applyDamageWithExecute(actor, target, dmg, isMagic);
+                applyOnHitPassives(actor, target, dmg, ability.dmgType);
+              }
             } else {
+              // İyileştirme gibi pozitif etkiler: hiçbir savunma zarı yok, her zaman uygulanır.
               applyEffectInstance(target, eff, ability.name || 'yetenek');
             }
           });
@@ -3135,6 +3158,15 @@
     const def = EFFECT_DEFS[effect.type];
     if(!def) return;
     switch(effect.type){
+      case 'damage': {
+        const amt = rollDiceExpr(effect.params.amount);
+        const before = target.hp;
+        target.hp = Math.max(0, target.hp - amt);
+        queueFloat(target.id, target.hp - before);
+        logSystemEvent(target.name + ' ' + sourceName + ' ile ' + amt + ' hasar aldı.');
+        checkDeath(target);
+        break;
+      }
       case 'heal': {
         const amt = rollDiceExpr(effect.params.amount);
         const before = target.hp;
