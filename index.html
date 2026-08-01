@@ -479,11 +479,13 @@
         </div>
 
         <button class="primary-btn" id="btn-end-turn" style="width:100%; margin-top:16px; display:none;">Turu Bitir</button>
+        <button class="ghost-btn" id="btn-end-battle" style="width:100%; margin-top:8px; display:none; color:var(--ember-bright); border-color:var(--ember-bright);">🏁 Savaşı Bitir</button>
       </div>
 
       <div id="chars-tab">
         <div id="char-list"></div>
         <button class="add-char-btn" id="btn-add-char" style="display:none;">+ Karakter Ekle</button>
+        <button class="ghost-btn" id="btn-refresh-chars" style="width:100%; margin-top:8px; display:none;">🔄 Tüm Karakterleri Yenile</button>
       </div>
 
       <div id="inv-tab">
@@ -646,6 +648,8 @@
         </div>
       </div>
     </div>
+
+    <button class="primary-btn" id="sheet-revive-btn" style="width:100%; display:none; margin-bottom:16px;">💀 Dirilt (1 Can, 0 Mana ile)</button>
 
     <div id="char-stat-block">
       <div class="stat-summary">
@@ -1172,6 +1176,7 @@
     $('hdr-code').textContent = me.code;
     $('hdr-role').textContent = me.role === 'dm' ? 'ZİNDAN USTASI' : 'OYUNCU · ' + me.name;
     $('btn-add-char').style.display = me.role === 'dm' ? 'block' : 'none';
+    $('btn-refresh-chars').style.display = me.role === 'dm' ? 'block' : 'none';
     $('btn-export').style.display = me.role === 'dm' ? 'inline-block' : 'none';
     $('btn-import').style.display = me.role === 'dm' ? 'inline-block' : 'none';
     $('tab-btn-creatures').style.display = me.role === 'dm' ? 'flex' : 'none';
@@ -1380,8 +1385,20 @@
     $('btn-end-turn').style.display = canEnd ? 'block' : 'none';
     $('btn-paint-terrain').style.display = me.role==='dm' ? 'block' : 'none';
     $('btn-lock-terrain').style.display = me.role==='dm' ? 'block' : 'none';
+    $('btn-end-battle').style.display = me.role==='dm' ? 'block' : 'none';
   }
   $('btn-end-turn').onclick = endTurn;
+
+  $('btn-end-battle').onclick = async () => {
+    if(me.role !== 'dm') return;
+    session.tokens.forEach(t => {
+      t.statusEffects = [];
+      t.elementState = null;
+    });
+    logSystemEvent('Savaş bitti — tüm birimlerin üzerindeki olumlu/olumsuz etkiler sıfırlandı.');
+    await pushRemote();
+    renderAll();
+  };
 
   $('btn-paint-terrain').onclick = () => {
     if(actionMode==='terrain'){ cancelActionMode(); return; }
@@ -1512,6 +1529,10 @@
     session.turnOrder = sorted.map(t=>t.id);
     session.activeTokenId = session.turnOrder[0] || null;
     session.roundNumber = 1;
+    Object.keys(session.terrain||{}).forEach(key => {
+      const cell = session.terrain[key];
+      if(cell && !cell.locked) delete session.terrain[key];
+    });
     const firstActive = session.tokens.find(t=>t.id===session.activeTokenId);
     if(firstActive) firstActive.turnResources = { action:true, bonus:true, move:true };
     await autoSkipStunned();
@@ -2458,6 +2479,15 @@
   // ---------- Add character modal ----------
   let mcColor = COLORS[0];
   $('btn-add-char').onclick = () => openModal();
+
+  $('btn-refresh-chars').onclick = async () => {
+    if(me.role !== 'dm') return;
+    const characters = session.tokens.filter(t => t.kind !== 'creature');
+    characters.forEach(t => { t.hp = getMaxHp(t); t.mp = getMaxMp(t); });
+    logSystemEvent('Tüm karakterlerin canı ve manası yenilendi.');
+    await pushRemote();
+    renderAll();
+  };
   $('mc-cancel').onclick = () => closeModal();
   function openModal(){
     $('mc-name').value='';
@@ -2500,6 +2530,17 @@
   // ---------- Character sheet ----------
   function getSheetToken(){ return session.tokens.find(t => t.id === currentSheetTokenId); }
 
+  $('sheet-revive-btn').onclick = async () => {
+    if(me.role !== 'dm') return;
+    const t = getSheetToken();
+    if(!t || t.kind==='creature' || t.hp>0) return;
+    t.hp = 1; t.mp = 0;
+    logSystemEvent(t.name + ' dirildi (1 Can, 0 Mana).');
+    await pushRemote();
+    renderSheet(t);
+    renderAll();
+  };
+
   function openSheet(id){
     currentSheetTokenId = id;
     const t = getSheetToken();
@@ -2520,6 +2561,7 @@
   function renderSheet(t){
     const editable = canControl(t);
     const isCreature = t.kind === 'creature';
+    $('sheet-revive-btn').style.display = (me.role==='dm' && !isCreature && t.hp<=0) ? 'block' : 'none';
     $('sheet-name').value = t.name;
     $('sheet-class').value = t.sheet.className || '';
     $('sheet-level').value = t.sheet.level || 1;
