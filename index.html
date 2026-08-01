@@ -443,10 +443,18 @@
     max-width:520px; border-radius:16px; border-top:1px solid var(--line);
   }
   body.desktop-mode .sheet-overlay{
-    max-width:640px; left:50%; top:5vh; height:90vh; transform:translate(-50%,20px);
+    inset:auto; right:auto; bottom:auto;
+    max-width:640px; left:50%; top:5vh; height:90vh;
+    transform:translate(-50%,40px); opacity:0; pointer-events:none;
+    transition:transform .22s ease, opacity .22s ease;
     border-radius:16px; border:1px solid var(--line); box-shadow:0 30px 80px rgba(0,0,0,.6);
   }
-  body.desktop-mode .sheet-overlay.open{ transform:translate(-50%,0); }
+  body.desktop-mode .sheet-overlay.open{
+    transform:translate(-50%,0); opacity:1; pointer-events:auto;
+  }
+  body.desktop-mode:has(.sheet-overlay.open)::before{
+    content:''; position:fixed; inset:0; background:rgba(10,8,14,.7); z-index:29;
+  }
   body.desktop-mode .sheet-top{ align-items:flex-start; }
 </style>
 </head>
@@ -1869,6 +1877,28 @@
 
   function canControl(t){
     return me.role === 'dm' || t.owner === me.name;
+  }
+
+  // ---------- Taraf (faction) sistemi — ileride yazılacak yapay zeka için temel ----------
+  // Karakterler ekranında oluşturulanlar (kind:'character') "Player" tarafı, Yaratıklar (kind:'creature') "Enemy" tarafı sayılır.
+  // Player'lar için: Player'lar dost, Enemy'ler düşman. Enemy'ler için: Enemy'ler dost, Player'lar düşman.
+  function getFaction(t){
+    return (t && t.kind === 'creature') ? 'enemy' : 'player';
+  }
+  function isAlly(a, b){
+    if(!a || !b) return false;
+    return getFaction(a) === getFaction(b);
+  }
+  function isEnemyOf(a, b){
+    if(!a || !b) return false;
+    return getFaction(a) !== getFaction(b);
+  }
+  // Savaştaki (haritada bulunan) tüm dostları/düşmanları döner — AI karar mantığı bunları kullanacak.
+  function getAllies(t){
+    return session.tokens.filter(x => (x.kind!=='creature'||x.inBattle) && x.id!==t.id && isAlly(x, t));
+  }
+  function getEnemiesOf(t){
+    return session.tokens.filter(x => (x.kind!=='creature'||x.inBattle) && x.id!==t.id && isEnemyOf(x, t));
   }
 
   let terrainPaintDef = null;
