@@ -674,6 +674,10 @@
       <label>Tür</label>
       <select id="ie-type"></select>
     </div>
+    <div class="field" id="ie-equipslot-row" style="display:none;">
+      <label>Ekipman Yeri</label>
+      <select id="ie-equipslot"></select>
+    </div>
     <div class="field">
       <label>Kalite</label>
       <div class="quality-row" id="ie-quality-row"></div>
@@ -796,7 +800,7 @@
   function blankEffect(){ return {type:'none', params:{}}; }
   function blankItemTemplate(){
     return { id:'it'+Date.now()+Math.floor(Math.random()*999), name:'Yeni Eşya', type:'Diğer', quality:'beyaz',
-      targetMode:'self', range:1, shape:'1x1',
+      targetMode:'self', range:1, shape:'1x1', equipSlot:'Silah',
       effects:[blankEffect(), blankEffect(), blankEffect()] };
   }
   // ---------- Zemin (terrain) sistemi ----------
@@ -2283,15 +2287,16 @@
 
   // ---------- Inventory tab ----------
   const EQUIP_SLOTS = [
-    {key:'weapon', label:'Silah'},
-    {key:'helmet', label:'Kafalık'},
-    {key:'armor', label:'Zırh'},
-    {key:'boots', label:'Ayakkabı'},
-    {key:'gloves', label:'Eldiven'},
-    {key:'ring1', label:'Yüzük 1'},
-    {key:'ring2', label:'Yüzük 2'},
-    {key:'necklace', label:'Kolye'}
+    {key:'weapon', label:'Silah', group:'Silah'},
+    {key:'helmet', label:'Kafalık', group:'Kafalık'},
+    {key:'armor', label:'Zırh', group:'Zırh'},
+    {key:'boots', label:'Ayakkabı', group:'Ayakkabı'},
+    {key:'gloves', label:'Eldiven', group:'Eldiven'},
+    {key:'ring1', label:'Yüzük 1', group:'Yüzük'},
+    {key:'ring2', label:'Yüzük 2', group:'Yüzük'},
+    {key:'necklace', label:'Kolye', group:'Kolye'}
   ];
+  const WEARABLE_GROUPS = ['Silah','Kafalık','Zırh','Ayakkabı','Eldiven','Yüzük','Kolye'];
 
   let invCharId = null;
   let invSubTab = 'players'; // sadece DM için: 'players' | 'creatures'
@@ -2431,6 +2436,11 @@
     const nm = document.createElement('div'); nm.className='item-name';
     nm.textContent = item.name + ((item.qty||1) > 1 ? ' ×' + item.qty : '');
     info.appendChild(nm);
+    if((item.tag||'').trim().toLocaleUpperCase('tr')==='GİYİLEBİLİR' && item.equipSlot){
+      const slotLine = document.createElement('div'); slotLine.style.fontSize='10.5px'; slotLine.style.color='var(--gold-bright)'; slotLine.style.marginTop='2px';
+      slotLine.textContent = item.equipSlot;
+      info.appendChild(slotLine);
+    }
     const effectNames = (item.effects||[]).filter(e=>e && e.type!=='none').map(e=>EFFECT_DEFS[e.type]?EFFECT_DEFS[e.type].label:e.type);
     if(effectNames.length){
       const eff = document.createElement('div'); eff.style.fontSize='10.5px'; eff.style.color='var(--text-dim)'; eff.style.marginTop='2px';
@@ -2486,7 +2496,10 @@
 
   function openEquipPicker(t, slotDef){
     const currentId = t.equipment ? t.equipment[slotDef.key] : null;
-    const wearable = (t.inventory||[]).filter(i => (i.tag||'').trim().toLocaleUpperCase('tr') === 'GİYİLEBİLİR');
+    const wearable = (t.inventory||[]).filter(i =>
+      (i.tag||'').trim().toLocaleUpperCase('tr') === 'GİYİLEBİLİR' &&
+      (!i.equipSlot || i.equipSlot === slotDef.group)
+    );
     const opts = [];
     if(currentId){
       opts.push({ label: '✕ Çıkar', value: '__unequip__' });
@@ -2504,7 +2517,7 @@
       t.equipment[slotDef.key] = (val === '__unequip__') ? null : val;
       pushRemote();
       renderInventoryTab();
-    }, '"Giyilebilir" etiketli eşyan yok. Önce Eşyalar bölümünden ekle.');
+    }, 'Bu slota uygun "Giyilebilir" eşyan yok.');
   }
 
   $('btn-add-item').onclick = () => {
@@ -2535,7 +2548,7 @@
     openPicker('Kütüphaneden Eşya Seç', opts, (tpl) => {
       addItemToInventory(t, {
         id:'i'+Date.now()+Math.floor(Math.random()*999),
-        name: tpl.name, tag: tpl.type, quality: tpl.quality,
+        name: tpl.name, tag: tpl.type, quality: tpl.quality, equipSlot: tpl.equipSlot||'Silah',
         targetMode: tpl.targetMode||'self', range: tpl.range||1, shape: tpl.shape||'1x1',
         effects: JSON.parse(JSON.stringify(tpl.effects||[]))
       });
@@ -2665,7 +2678,8 @@
       const nm = document.createElement('div'); nm.className='tpl-name'; nm.textContent = tpl.name;
       const effectNames = (tpl.effects||[]).filter(e=>e && e.type!=='none').map(e=>EFFECT_DEFS[e.type]?EFFECT_DEFS[e.type].label:e.type);
       const meta = document.createElement('div'); meta.className='tpl-meta';
-      meta.textContent = tpl.type + (effectNames.length ? ' · ' + effectNames.join(', ') : '');
+      const typeText = tpl.type==='Giyilebilir' ? (tpl.type + ' · ' + (tpl.equipSlot||'Silah')) : tpl.type;
+      meta.textContent = typeText + (effectNames.length ? ' · ' + effectNames.join(', ') : '');
       info.appendChild(nm); info.appendChild(meta);
       card.appendChild(info);
 
@@ -2722,7 +2736,17 @@
       if(tpl.type === ty) o.selected = true;
       typeSel.appendChild(o);
     });
-    typeSel.onchange = async () => { tpl.type = typeSel.value; await pushRemote(); };
+    typeSel.onchange = async () => { tpl.type = typeSel.value; renderItemEditor(); await pushRemote(); };
+
+    $('ie-equipslot-row').style.display = (tpl.type==='Giyilebilir') ? 'block' : 'none';
+    const eqSel = $('ie-equipslot');
+    eqSel.innerHTML = '';
+    WEARABLE_GROUPS.forEach(g => {
+      const o = document.createElement('option'); o.value = g; o.textContent = g;
+      if((tpl.equipSlot||'Silah')===g) o.selected = true;
+      eqSel.appendChild(o);
+    });
+    eqSel.onchange = async () => { tpl.equipSlot = eqSel.value; await pushRemote(); };
 
     const qRow = $('ie-quality-row');
     qRow.innerHTML = '';
