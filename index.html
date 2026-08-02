@@ -202,6 +202,7 @@
   .wm-cell{ border:1px solid rgba(255,255,255,.03); }
   .wm-cell.paint-mode{ cursor:pointer; }
   .wm-cell.paint-mode:hover{ outline:2px solid var(--gold); outline-offset:-2px; }
+  .wm-cell.terrain-sari_yol{ background:rgba(224,184,60,.5); border-color:rgba(224,184,60,.85); }
   .wm-cell.terrain-kiyi_deniz{ background:rgba(126,200,227,.55); border-color:rgba(126,200,227,.8); }
   .wm-cell.terrain-acik_deniz{ background:rgba(23,63,107,.75); border-color:rgba(23,63,107,.9); }
   .wm-cell.terrain-cimenlik{ background:rgba(143,214,122,.5); border-color:rgba(143,214,122,.8); }
@@ -2922,6 +2923,7 @@
     {id:'bagdat',   name:'Bagdat',   type:'şehir', row:13, col:20, rowSpan:3, colSpan:3}
   ];
   const WORLD_TERRAIN_TYPES = {
+    sari_yol:    { key:'sari_yol',    label:'Sarı (Yol)',         color:'#e0b83c', cost:1, dice:40, ambushOn:[1], treasureOn:40 },
     kiyi_deniz:  { key:'kiyi_deniz',  label:'Kıyı Denizi',        color:'#7ec8e3', passable:false, needsBoat:true },
     acik_deniz:  { key:'acik_deniz',  label:'Açık Deniz/Okyanus', color:'#173f6b', passable:false, needsBoat:true },
     cimenlik:    { key:'cimenlik',    label:'Düz Çimenlik',       color:'#8fd67a', cost:1, dice:20, ambushOn:[1], treasureOn:null },
