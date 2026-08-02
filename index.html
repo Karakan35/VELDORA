@@ -946,6 +946,10 @@
           <div class="field"><label>Sınıf</label><input id="sheet-class" type="text" placeholder="ör. Savaşçı"></div>
           <div class="field"><label>Seviye</label><input id="sheet-level" type="number" min="1"></div>
         </div>
+        <div class="field" id="sheet-mainclass-row" style="display:none;">
+          <label>Ana Class</label>
+          <select id="sheet-mainclass"></select>
+        </div>
       </div>
     </div>
 
@@ -1098,6 +1102,31 @@
   ];
 
   const ITEM_TYPES = ['Kullanılabilir','Giyilebilir','Malzeme','Ivır Zıvır','Diğer'];
+  const CLASS_DEFS = [
+    {key:'', label:'— Seçilmedi —'},
+    {key:'barbar', label:'Barbar', noEquipGroups:['Zırh'], extraTurnOnKill:true},
+    {key:'rahip', label:'Rahip', statBonusSkill:'İLİM', statBonusAmount:1, healAdvantage:true},
+    {key:'druid', label:'Druid', statBonusSkill:'DOĞA / HAYVAN', statBonusAmount:1},
+    {key:'bard', label:'Bard', advantageSkills:['KAYNAKLAR','PAZARLIK','KONTAKLAR','İKNA / MUHABBET']},
+    {key:'savasci', label:'Savaşçı', extraBonusAction:true},
+    {key:'kesis', label:'Keşiş', noEquipGroups:['Silah'], attackAdvantage:true},
+    {key:'paladin', label:'Paladin', direncHpMultiplier:2},
+    {key:'buyucu', label:'Büyücü', advantageSkills:['HİS','SEZGİ']},
+    {key:'warlock', label:'Warlock', noMana:true, iradeAsHp:true},
+    {key:'sahibe', label:'Sahibe', iradeManaMultiplier:2},
+    {key:'mucit', label:'Mucit', advantageSkills:['ÜRETİM']},
+    {key:'okcu', label:'Okçu', advantageSkills:['ATICILIK']},
+    {key:'hirsiz', label:'Hırsız', advantageSkills:['GİZLİLİK','EL ÇABUKLUĞU']}
+  ];
+  function getClassDef(t){
+    return CLASS_DEFS.find(c => c.key === (t.sheet && t.sheet.charClass)) || CLASS_DEFS[0];
+  }
+  function classHasAdvantageForSkill(t, label){
+    const cd = getClassDef(t);
+    if(!cd.advantageSkills) return false;
+    const up = (label||'').trim().toUpperCase();
+    return cd.advantageSkills.some(s => s.trim().toUpperCase() === up);
+  }
   const BUFFABLE_STATS = ['acBoost','dmgBoost','statBonus','movementBoost','maxHpBoost','maxManaBoost'];
   const QUALITIES = [
     {key:'beyaz',    label:'Değersiz',  color:'#c9c2b8'},
@@ -1160,8 +1189,12 @@
                   {key:'statusName', label:'Durum', type:'select', options:['Stun','Freeze','Sleep','Shocked']},
                   {key:'duration', label:'Süre (Tur)', type:'number'} ] },
     resistance:{ label:'Direnç (Resistance)', params:[
-                  {key:'statusName', label:'Hangi Duruma', type:'select', options:['Yanma','Islanma','Donma','Şoklanma (Elektrik)','Zehirlenme','Stun','Sleep','Silence']} ] },
+                  {key:'statusName', label:'Hangi Duruma', type:'select', options:['Yanma','Islanma','Donma','Şoklanma (Elektrik)','Zehirlenme','Stun','Sleep','Silence','Blind']} ] },
     silence:  { label:'Susturma (Silence)', params:[
+                  {key:'duration', label:'Süre (Tur)', type:'number'} ] },
+    float:    { label:'Süzülme (Float)', params:[
+                  {key:'duration', label:'Süre (Tur)', type:'number'} ] },
+    blind:    { label:'Kör Etme (Blind)', params:[
                   {key:'duration', label:'Süre (Tur)', type:'number'} ] },
     lifesteal:{ label:'Can Çalma (Lifesteal)', params:[
                   {key:'percent', label:'Oran (%)', type:'number'} ] },
@@ -1321,6 +1354,12 @@
   function hasSilence(t){
     return (t.statusEffects||[]).some(se => se.effectType==='silence');
   }
+  function hasFloat(t){
+    return (t.statusEffects||[]).some(se => se.effectType==='float');
+  }
+  function isBlinded(t){
+    return (t.statusEffects||[]).some(se => se.effectType==='blind');
+  }
 
   // ---------- Element (yanma/islak/soguk/zehir/elektrik) reaksiyon motoru ----------
   function rollSaveVsElement(t){
@@ -1454,6 +1493,8 @@
       }
     });
     val += collectBuffDebuff(t, 'statBonus', p => (p.stat||'').trim().toUpperCase() === label);
+    const cd = getClassDef(t);
+    if(cd.statBonusSkill && cd.statBonusSkill.trim().toUpperCase() === label) val += cd.statBonusAmount||0;
     return val;
   }
   function getMaxHp(t){
@@ -1464,12 +1505,17 @@
     let equipBonus = 0;
     getEquippedEffects(t).forEach(({eff}) => { if(eff.type==='maxHpBoost') equipBonus += parseInt(eff.params.amount)||0; });
     equipBonus += collectBuffDebuff(t, 'maxHpBoost');
-    return Math.max(1, level + direnc + bonus + equipBonus);
+    const cd = getClassDef(t);
+    const direncContribution = direnc * (cd.direncHpMultiplier||1);
+    const iradeAsHp = cd.iradeAsHp ? findSkillValue(t, 'İRADE') : 0;
+    return Math.max(1, level + direncContribution + iradeAsHp + bonus + equipBonus);
   }
   function getMaxMp(t){
     if(t.kind==='creature' && t.sheet && t.sheet.fixedMaxMp != null) return Math.max(0, t.sheet.fixedMaxMp + collectBuffDebuff(t,'maxManaBoost'));
+    const cd = getClassDef(t);
+    if(cd.noMana) return 0;
     const level = (t.sheet && t.sheet.level) || 1;
-    const irade = findSkillValue(t, 'İRADE');
+    const irade = findSkillValue(t, 'İRADE') * (cd.iradeManaMultiplier||1);
     const bonus = (t.sheet && t.sheet.manaBonus) || 0;
     let equipBonus = 0;
     getEquippedEffects(t).forEach(({eff}) => { if(eff.type==='maxManaBoost') equipBonus += parseInt(eff.params.amount)||0; });
@@ -1760,7 +1806,7 @@
     if(!t.equipment) t.equipment = {};
     if(!t.statusEffects) t.statusEffects = [];
     if(t.elementState === undefined) t.elementState = null;
-    if(!t.turnResources) t.turnResources = { action:true, bonus:true, move:true };
+    if(!t.turnResources) t.turnResources = freshTurnResources(t);
     if(!t.kind) t.kind = 'character';
     if(t.inBattle == null) t.inBattle = (t.kind === 'character');
     if(t.kind==='creature' && !t.aiType) t.aiType = 'aggressive';
@@ -1939,7 +1985,7 @@
     }
     session.activeTokenId = activeIds[nextIdx];
     const newActive = session.tokens.find(t=>t.id===session.activeTokenId);
-    if(newActive) newActive.turnResources = { action:true, bonus:true, move:true };
+    if(newActive) newActive.turnResources = freshTurnResources(newActive);
   }
 
   // Sırası gelen birim sersemlemiş (stun) durumdaysa turunu otomatik atlar, etkileri yine de işler.
@@ -1966,7 +2012,7 @@
       if(cell && !cell.locked) delete session.terrain[key];
     });
     const firstActive = session.tokens.find(t=>t.id===session.activeTokenId);
-    if(firstActive) firstActive.turnResources = { action:true, bonus:true, move:true };
+    if(firstActive) firstActive.turnResources = freshTurnResources(firstActive);
     await autoSkipStunned();
     await pushRemote();
     renderAll();
@@ -1981,6 +2027,14 @@
     if(activeIds.length === 0) return;
     const active = session.tokens.find(t=>t.id===session.activeTokenId);
     if(!(me.role==='dm' || (active && active.owner===me.name))) return;
+    if(active && active.pendingExtraTurn){
+      active.pendingExtraTurn = false;
+      active.turnResources = freshTurnResources(active);
+      logSystemEvent(active.name + ' bir düşmanı öldürdüğü için turunu tekrar oynuyor!');
+      await pushRemote();
+      renderAll();
+      return;
+    }
     await advanceTurnInternal();
     await autoSkipStunned();
     await pushRemote();
@@ -2556,7 +2610,7 @@
     actionMode = null; actingTokenId = null;
     consumeResource(t, 'move');
     const terr = session.terrain[row+','+col];
-    if(terr && terr.type && t.movementType !== 'ucan'){
+    if(terr && terr.type && t.movementType !== 'ucan' && !hasFloat(t)){
       const def = terrainDef(terr.type);
       if(def && def.element){
         applyElementEffect(t, def.element, def.label);
@@ -2622,7 +2676,7 @@
     const res = t.turnResources || {action:true, bonus:true, move:true};
     $('am-walk').style.opacity = res.move===false ? '.5' : '1';
     $('am-melee').style.opacity = res.action===false ? '.5' : '1';
-    $('am-item').style.opacity = res.bonus===false ? '.5' : '1';
+    $('am-item').style.opacity = hasBonusResource(t) ? '1' : '.5';
     $('am-reset').style.display = me.role==='dm' ? 'block' : 'none';
     $('action-menu-backdrop').classList.add('open');
   }
@@ -2648,9 +2702,19 @@
     });
   }
 
+  function freshTurnResources(t){
+    const res = { action:true, bonus:true, move:true };
+    if(t && getClassDef(t).extraBonusAction) res.bonusExtra = true;
+    return res;
+  }
+  function hasBonusResource(t){
+    const res = t.turnResources || {bonus:true};
+    return res.bonus !== false || res.bonusExtra === true;
+  }
+
   async function resetTurnResources(t){
     if(me.role !== 'dm') return;
-    t.turnResources = { action:true, bonus:true, move:true };
+    t.turnResources = freshTurnResources(t);
     await pushRemote();
     renderActionMenuResources(t);
     renderAll();
@@ -2662,9 +2726,13 @@
 
   // Bir birimin aksiyon/bonus/yürüme hakkı bittiğinde ve sırası kendisindeyse turu otomatik bitirir.
   function consumeResource(t, kind){
-    if(!t.turnResources) t.turnResources = {action:true, bonus:true, move:true};
-    t.turnResources[kind] = false;
-    if(t.id === session.activeTokenId && !t.turnResources.action && !t.turnResources.bonus && !t.turnResources.move){
+    if(!t.turnResources) t.turnResources = freshTurnResources(t);
+    if(kind === 'bonus' && t.turnResources.bonusExtra){
+      t.turnResources.bonusExtra = false;
+    } else {
+      t.turnResources[kind] = false;
+    }
+    if(t.id === session.activeTokenId && !t.turnResources.action && !hasBonusResource(t) && !t.turnResources.move){
       setTimeout(() => { endTurn(); }, 400);
     }
   }
@@ -2692,7 +2760,7 @@
     const t = session.tokens.find(x=>x.id===actingTokenId);
     closeActionMenu();
     if(!t) return;
-    if(t.turnResources && t.turnResources.bonus===false){ alert('Bu tur bonus aksiyon hakkın kalmadı.'); return; }
+    if(t.turnResources && !hasBonusResource(t)){ alert('Bu tur bonus aksiyon hakkın kalmadı.'); return; }
     openItemPicker(t);
   };
 
@@ -2725,7 +2793,7 @@
     const opts = abilities.map(a => {
       const actType = a.actionType || 'action';
       const typeLabel = actType==='bonus' ? 'Bonus' : (actType==='reaction' ? 'Reaksiyon' : 'Aksiyon');
-      const resourceMissing = actType==='action' ? (res.action===false) : (actType==='bonus' ? (res.bonus===false) : false);
+      const resourceMissing = actType==='action' ? (res.action===false) : (actType==='bonus' ? !hasBonusResource(t) : false);
       return {
         label: '<b>'+esc(a.name)+'</b> <span class="n">'+typeLabel+' · '+a.manaCost+' mana · menzil '+a.range+'</span>',
         value: a, icon: a.icon || null,
@@ -2886,6 +2954,9 @@
   function checkDeath(t, killer){
     if(t.kind==='creature' && t.inBattle && t.hp<=0){
       handleCreatureDeathLoot(t);
+      if(killer && killer.kind==='character' && getClassDef(killer).extraTurnOnKill){
+        killer.pendingExtraTurn = true;
+      }
       playDeathAnimation(t.id);
     } else if(t.kind!=='creature' && t.hp<=0){
       checkRevive(t);
@@ -3551,6 +3622,33 @@
     }, 55);
   }
 
+  // ---------- Avantaj / Dezavantaj zar sistemi ----------
+  // mode: 'advantage' (2 zar atar, yükseği alır) | 'disadvantage' (2 zar atar, düşüğü alır) | 'normal'
+  async function rollD20Mode(mode){
+    if(mode !== 'advantage' && mode !== 'disadvantage'){
+      const r = 1 + Math.floor(Math.random()*20);
+      await new Promise(resolve => showDiceRollFX(20, r, resolve));
+      return r;
+    }
+    const r1 = 1 + Math.floor(Math.random()*20);
+    const r2 = 1 + Math.floor(Math.random()*20);
+    await new Promise(resolve => showDiceRollFX(20, r1, resolve));
+    await new Promise(resolve => showDiceRollFX(20, r2, resolve));
+    return mode === 'advantage' ? Math.max(r1, r2) : Math.min(r1, r2);
+  }
+  function getRollMode(t, skillLabel, isHealAbility){
+    let adv = false, disadv = false;
+    if(isBlinded(t)) disadv = true;
+    const cd = getClassDef(t);
+    if(isHealAbility && cd.healAdvantage) adv = true;
+    if(cd.attackAdvantage && (skillLabel==='YAKIN DÖVÜŞ' || skillLabel==='ATICILIK' || skillLabel==null)) adv = true;
+    if(skillLabel && classHasAdvantageForSkill(t, skillLabel)) adv = true;
+    if(adv && disadv) return 'normal';
+    if(adv) return 'advantage';
+    if(disadv) return 'disadvantage';
+    return 'normal';
+  }
+
   function getFatiguePenalty(t){
     if(!t || t.kind==='creature') return 0;
     return -Math.floor((t.fatigue||0)/2);
@@ -3915,6 +4013,19 @@
     $('sheet-name').value = t.name;
     $('sheet-class').value = t.sheet.className || '';
     $('sheet-level').value = t.sheet.level || 1;
+    if(t.kind === 'character'){
+      $('sheet-mainclass-row').style.display = 'block';
+      const msel = $('sheet-mainclass');
+      msel.innerHTML = '';
+      CLASS_DEFS.forEach(c => {
+        const o = document.createElement('option'); o.value = c.key; o.textContent = c.label;
+        if((t.sheet.charClass||'') === c.key) o.selected = true;
+        msel.appendChild(o);
+      });
+      msel.disabled = !editable;
+    } else {
+      $('sheet-mainclass-row').style.display = 'none';
+    }
     $('sheet-hpbonus').value = t.sheet.hpBonus || 0;
     $('sheet-manabonus').value = t.sheet.manaBonus || 0;
     $('sheet-fatigue').value = t.fatigue || 0;
@@ -4451,6 +4562,11 @@
 
 
   function openEquipPicker(t, slotDef){
+    const cd = getClassDef(t);
+    if(cd.noEquipGroups && cd.noEquipGroups.includes(slotDef.group)){
+      alert(cd.label + ' sınıfı ' + slotDef.label + ' kuşanamaz.');
+      return;
+    }
     const currentId = t.equipment ? t.equipment[slotDef.key] : null;
     const wearable = (t.inventory||[]).filter(i =>
       (i.tag||'').trim().toLocaleUpperCase('tr') === 'GİYİLEBİLİR' &&
@@ -5157,25 +5273,25 @@
     renderCreatureList();
   };
 
-  function performRoll(t, skill){
-    const roll = 1 + Math.floor(Math.random()*20);
-    const skillBonus = skill ? findSkillValue(t, skill.label.trim().toUpperCase()) : 0;
+  async function performRoll(t, skill){
+    const skillLabel = skill ? skill.label.trim().toUpperCase() : null;
+    const mode = getRollMode(t, skillLabel, false);
+    const roll = await rollD20Mode(mode);
+    const skillBonus = skill ? findSkillValue(t, skillLabel) : 0;
     const fatiguePenalty = getFatiguePenalty(t);
     const bonus = skillBonus + fatiguePenalty;
     const total = roll + bonus;
-    showDiceRollFX(20, roll, () => {
-      const entry = {
-        id: 'r'+Date.now()+Math.floor(Math.random()*999),
-        charName: t.name, skillLabel: skill ? skill.label : null,
-        roll, bonus, total, ts: Date.now()
-      };
-      session.rollLog = session.rollLog || [];
-      session.rollLog.unshift(entry);
-      session.rollLog = session.rollLog.slice(0, 15);
-      pushRemote();
-      renderRollLog();
-      showRollToast(entry);
-    });
+    const entry = {
+      id: 'r'+Date.now()+Math.floor(Math.random()*999),
+      charName: t.name, skillLabel: skill ? skill.label : null,
+      roll, bonus, total, ts: Date.now(), mode: mode!=='normal' ? mode : null
+    };
+    session.rollLog = session.rollLog || [];
+    session.rollLog.unshift(entry);
+    session.rollLog = session.rollLog.slice(0, 15);
+    pushRemote();
+    renderRollLog();
+    showRollToast(entry);
   }
 
   function showRollToast(entry){
@@ -5201,8 +5317,8 @@
     const range = actor.sheet.meleeRange || 1;
     const skillLabel = range<=1 ? 'YAKIN DÖVÜŞ' : 'ATICILIK';
     const skillVal = findSkillValue(actor, skillLabel) + getFatiguePenalty(actor);
-    const roll = 1 + Math.floor(Math.random()*20);
-    await new Promise(resolve => showDiceRollFX(20, roll, resolve));
+    const mode = getRollMode(actor, skillLabel, false);
+    const roll = await rollD20Mode(mode);
     const total = roll + skillVal;
     const ac = getEffectiveAC(target, false);
     let hit = total >= ac;
@@ -5232,13 +5348,23 @@
 
   async function resolveAbilityAtCell(actor, ability, centerRow, centerCol){
     if(!actor || !ability) return;
-    if((actor.mp||0) < (ability.manaCost||0)){ alert('Yetersiz mana!'); actionMode=null; actingTokenId=null; pendingAbility=null; renderGrid(); return; }
-    if(ability.manaCost) queueFloat(actor.id, -(ability.manaCost||0), 'mp');
-    actor.mp = Math.max(0, actor.mp - (ability.manaCost||0));
+    const actorClass = getClassDef(actor);
+    if(actorClass.noMana){
+      if((actor.hp||0) <= (ability.manaCost||0)){ alert('Yetersiz can (Warlock manası candan gider)!'); actionMode=null; actingTokenId=null; pendingAbility=null; renderGrid(); return; }
+      if(ability.manaCost) queueFloat(actor.id, -(ability.manaCost||0), 'hp');
+      actor.hp = Math.max(0, actor.hp - (ability.manaCost||0));
+      checkDeath(actor);
+    } else {
+      if((actor.mp||0) < (ability.manaCost||0)){ alert('Yetersiz mana!'); actionMode=null; actingTokenId=null; pendingAbility=null; renderGrid(); return; }
+      if(ability.manaCost) queueFloat(actor.id, -(ability.manaCost||0), 'mp');
+      actor.mp = Math.max(0, actor.mp - (ability.manaCost||0));
+    }
 
+    const isHealAbility = (ability.effects||[]).some(e => e && (e.type==='heal' || e.type==='hot'));
+    const skillLabelUp = (ability.skillLabel||'').trim().toUpperCase();
+    const mode = getRollMode(actor, skillLabelUp, isHealAbility);
     const skillVal = findSkillValue(actor, ability.skillLabel||'') + getFatiguePenalty(actor);
-    const roll = 1 + Math.floor(Math.random()*20);
-    await new Promise(resolve => showDiceRollFX(20, roll, resolve));
+    const roll = await rollD20Mode(mode);
     const total = roll + skillVal;
     const isMagic = ability.dmgType === 'buyusel';
     const shapeDef = AOE_SHAPES[ability.shape] || AOE_SHAPES['1x1'];
@@ -5523,9 +5649,9 @@
         }
         break;
       }
-      case 'dot': case 'hot': case 'stun': case 'silence': {
+      case 'dot': case 'hot': case 'stun': case 'silence': case 'float': case 'blind': {
         const statusLabel = effect.params.statusName || def.label;
-        if((effect.type==='stun') && hasResistance(target, statusLabel)){
+        if((effect.type==='stun' || effect.type==='blind') && hasResistance(target, effect.type==='blind' ? 'Blind' : statusLabel)){
           logSystemEvent(target.name + ' dirençli olduğu için etkilenmedi.');
           break;
         }
@@ -5706,6 +5832,12 @@
     const t = getSheetToken(); if(!t) return;
     t.sheet.className = $('sheet-class').value;
     pushRemote();
+  };
+  $('sheet-mainclass').onchange = () => {
+    const t = getSheetToken(); if(!t || t.kind!=='character') return;
+    t.sheet.charClass = $('sheet-mainclass').value;
+    recalcAndSave(t);
+    renderSheet(t);
   };
   $('sheet-level').onchange = () => {
     const t = getSheetToken(); if(!t) return;
