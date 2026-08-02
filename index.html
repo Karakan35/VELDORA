@@ -2909,18 +2909,18 @@
   const WM_COLS = 24, WM_ROWS = 18;
   // Kullanıcının verdiği koordinatlar 1-indexli; burada 0-indexe çevrilip saklanıyor (row/col = üst-sol köşe, span = kapladığı hücre sayısı)
   const WORLD_MAP_CITIES = [
-    {id:'thalorin', name:'Thalorin', type:'köy',   row:1,  col:2,  rowSpan:1, colSpan:1},
-    {id:'lunanda',  name:'Lunanda',  type:'köy',   row:1,  col:7,  rowSpan:1, colSpan:1},
-    {id:'esilen',   name:'Esilen',   type:'kasaba',row:1,  col:19, rowSpan:2, colSpan:2},
-    {id:'sarezhar', name:'Sarezhar', type:'şehir', row:3,  col:9,  rowSpan:3, colSpan:3},
-    {id:'sparta',   name:'Sparta',   type:'köy',   row:7,  col:3,  rowSpan:1, colSpan:1},
-    {id:'baldur',   name:'Baldur',   type:'kasaba',row:8,  col:7,  rowSpan:2, colSpan:2},
-    {id:'orgstan',  name:'Orgstan',  type:'köy',   row:11, col:4,  rowSpan:1, colSpan:1},
-    {id:'moria',    name:'Moria',    type:'köy',   row:13, col:10, rowSpan:1, colSpan:1},
-    {id:'sham',     name:'Sham',     type:'köy',   row:9,  col:13, rowSpan:1, colSpan:1},
-    {id:'akad',     name:'Akad',     type:'köy',   row:11, col:18, rowSpan:1, colSpan:1},
-    {id:'zumer',    name:'Zumer',    type:'köy',   row:6,  col:20, rowSpan:1, colSpan:1},
-    {id:'bagdat',   name:'Bagdat',   type:'şehir', row:13, col:20, rowSpan:3, colSpan:3}
+    {id:'thalorin', name:'Thalorin', type:'köy',   row:1,  col:2,  rowSpan:1, colSpan:1, color:'#8a6fae'},
+    {id:'lunanda',  name:'Lunanda',  type:'köy',   row:1,  col:7,  rowSpan:1, colSpan:1, color:'#8a6fae'},
+    {id:'esilen',   name:'Esilen',   type:'kasaba',row:1,  col:19, rowSpan:2, colSpan:2, color:'#8a6fae'},
+    {id:'sarezhar', name:'Sarezhar', type:'şehir', row:3,  col:9,  rowSpan:3, colSpan:3, color:'#8a6fae'},
+    {id:'sparta',   name:'Sparta',   type:'köy',   row:7,  col:3,  rowSpan:1, colSpan:1, color:'#c2a668'},
+    {id:'baldur',   name:'Baldur',   type:'kasaba',row:8,  col:7,  rowSpan:2, colSpan:2, color:'#c2a668'},
+    {id:'orgstan',  name:'Orgstan',  type:'köy',   row:11, col:4,  rowSpan:1, colSpan:1, color:'#c2a668'},
+    {id:'moria',    name:'Moria',    type:'köy',   row:13, col:10, rowSpan:1, colSpan:1, color:'#c2a668'},
+    {id:'sham',     name:'Sham',     type:'köy',   row:9,  col:13, rowSpan:1, colSpan:1, color:'#4f6b3a'},
+    {id:'akad',     name:'Akad',     type:'köy',   row:11, col:18, rowSpan:1, colSpan:1, color:'#4f6b3a'},
+    {id:'zumer',    name:'Zumer',    type:'köy',   row:6,  col:20, rowSpan:1, colSpan:1, color:'#4f6b3a'},
+    {id:'bagdat',   name:'Bagdat',   type:'şehir', row:13, col:20, rowSpan:3, colSpan:3, color:'#4f6b3a'}
   ];
   const WORLD_TERRAIN_TYPES = {
     sari_yol:    { key:'sari_yol',    label:'Sarı (Yol)',         color:'#e0b83c', cost:1, dice:40, ambushOn:[1], treasureOn:40 },
@@ -2994,6 +2994,7 @@
   function renderWmCities(){
     const wrap = $('wm-cities');
     wrap.innerHTML = '';
+    wrap.style.pointerEvents = (wmPaintMode || wmPlaceMode) ? 'none' : 'auto';
     WORLD_MAP_CITIES.forEach(city => {
       const marker = document.createElement('div');
       marker.className = 'wm-city-marker' + (city.type==='kasaba' ? ' size-town' : city.type==='şehir' ? ' size-city' : '');
@@ -3001,6 +3002,8 @@
       marker.style.top = (city.row/WM_ROWS*100) + '%';
       marker.style.width = (city.colSpan/WM_COLS*100) + '%';
       marker.style.height = (city.rowSpan/WM_ROWS*100) + '%';
+      marker.style.background = city.color + '55';
+      marker.style.border = '1px solid ' + city.color;
       const label = document.createElement('div');
       label.className = 'wm-city-label';
       label.textContent = city.name;
@@ -3113,6 +3116,7 @@
     $('btn-wm-paint').classList.toggle('active', wmPaintMode);
     $('wm-terrain-palette').style.display = wmPaintMode ? 'flex' : 'none';
     if(wmPaintMode) renderWmTerrainPalette();
+    $('wm-cities').style.pointerEvents = (wmPaintMode || wmPlaceMode) ? 'none' : 'auto';
     renderWmGrid();
   };
 
@@ -3136,6 +3140,7 @@
     if(wmPlaceMode) wmPaintMode = false;
     $('wm-terrain-palette').style.display = 'none';
     $('btn-wm-place-party').classList.toggle('active', wmPlaceMode);
+    $('wm-cities').style.pointerEvents = (wmPaintMode || wmPlaceMode) ? 'none' : 'auto';
     renderWmGrid();
   };
 
