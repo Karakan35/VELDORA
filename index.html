@@ -98,6 +98,12 @@
   }
   .cell-range{ position:absolute; background:rgba(201,154,63,.16); border:1px solid rgba(201,154,63,.4); border-radius:3px; }
   .terrain-cell{ position:absolute; border:1px solid; border-radius:3px; }
+  .ground-loot{
+    position:absolute; display:flex; align-items:center; justify-content:center; font-size:18px;
+    border:2px dashed var(--gold); border-radius:6px; background:rgba(201,154,63,.14); pointer-events:none; z-index:3;
+    animation: groundLootPulse 1.4s ease-in-out infinite;
+  }
+  @keyframes groundLootPulse{ 0%,100%{ opacity:.75; transform:scale(1); } 50%{ opacity:1; transform:scale(1.08); } }
   .cell-range.melee-tint{ background:rgba(226,99,42,.16); border-color:rgba(226,99,42,.45); }
   .cell-range.ability-tint{ background:rgba(90,127,166,.2); border-color:rgba(90,127,166,.55); }
   @keyframes tokenDeath{
@@ -117,6 +123,7 @@
   .float-number.heal{ color:var(--ok); text-shadow:0 0 8px rgba(111,143,90,.85); }
   .float-number.dmg{ color:var(--ember-bright); text-shadow:0 0 8px rgba(226,99,42,.85); }
   .float-number.mana{ color:var(--mana); text-shadow:0 0 8px rgba(90,127,166,.9); }
+  .float-number.gold{ color:var(--gold-bright); text-shadow:0 0 10px rgba(201,154,63,.95); font-size:16px; }
   @keyframes healGlow{ 0%{ box-shadow:0 0 0 0 rgba(111,143,90,.9); } 100%{ box-shadow:0 0 20px 8px rgba(111,143,90,0); } }
   @keyframes dmgGlow{ 0%{ box-shadow:0 0 0 0 rgba(226,99,42,.9); } 100%{ box-shadow:0 0 20px 8px rgba(226,99,42,0); } }
   @keyframes manaGlow{ 0%{ box-shadow:0 0 0 0 rgba(90,127,166,.9); } 100%{ box-shadow:0 0 20px 8px rgba(90,127,166,0); } }
@@ -265,6 +272,15 @@
     background:rgba(157,147,173,.14); border:1px solid var(--line); border-radius:10px; padding:2px 7px; margin-top:4px;
   }
   .dice-fatigue-note{ font-size:11px; color:var(--ember-bright); text-align:center; margin-top:6px; }
+  .shared-gold-banner{
+    display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; margin-bottom:14px;
+    background:rgba(201,154,63,.14); border:1px solid var(--gold); border-radius:8px; font-size:13px; font-weight:700; color:var(--gold-bright);
+  }
+  .shared-gold-banner input{
+    width:90px; text-align:right; background:var(--ink-2); border:1px solid var(--gold); border-radius:6px; color:var(--gold-bright);
+    font-weight:700; font-size:14px; padding:5px 8px;
+  }
+  .shared-gold-banner input:disabled{ opacity:.85; }
 
   /* Dice roll animation overlay */
   .dice-roll-overlay{
@@ -365,10 +381,22 @@
   }
   .portrait-wrap img{ width:100%; height:100%; object-fit:cover; }
   .portrait-wrap #portrait-placeholder{ font-size:11px; color:var(--text-dim); text-align:center; }
+  .icon-pick-wrap{
+    width:52px; height:52px; border-radius:10px; background:var(--ink-2); border:1px solid var(--line);
+    flex-shrink:0; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative;
+  }
+  .icon-pick-wrap img{ width:100%; height:100%; object-fit:cover; }
+  .icon-pick-wrap .icon-pick-placeholder{ font-size:16px; color:var(--text-dim); }
   .sheet-top-fields{ flex:1; display:flex; flex-direction:column; gap:10px; }
   .field-row{ display:flex; gap:10px; }
   .field-row .field{ flex:1; }
   .sheet-section-title{ font-size:13px; color:var(--gold-bright); margin-bottom:10px; letter-spacing:.04em; }
+  .sheet-section-title.collapsible{ cursor:pointer; display:flex; align-items:center; justify-content:space-between; user-select:none; padding:4px 0; }
+  .sheet-section-title.collapsible .sec-arrow{ font-size:11px; transition:transform .2s ease; }
+  .sheet-section-title.collapsible.collapsed .sec-arrow{ transform:rotate(-90deg); }
+  .npc-hearts{ display:flex; gap:4px; align-items:center; flex-wrap:wrap; }
+  .npc-heart{ font-size:20px; cursor:pointer; user-select:none; filter:grayscale(1) opacity(.4); }
+  .npc-heart.filled{ filter:none; }
   .stat-summary{ display:flex; gap:10px; margin-bottom:14px; }
   .stat-box{
     flex:1; background:var(--ink-2); border:1px solid var(--line); border-radius:8px; padding:10px 8px; text-align:center;
@@ -426,6 +454,11 @@
   }
   .skill-label:disabled, .skill-cat:disabled, .skill-val:disabled,
   #sheet-name:disabled, #sheet-class:disabled, #sheet-level:disabled{ opacity:.6; }
+  .skill-point-btn{
+    width:28px; height:28px; flex-shrink:0; border-radius:6px; border:1px solid var(--gold); background:rgba(201,154,63,.16);
+    color:var(--gold-bright); font-weight:800; font-size:15px; display:flex; align-items:center; justify-content:center;
+  }
+  .skill-point-btn:disabled{ opacity:.25; border-color:var(--line); color:var(--text-dim); }
 
   /* ---------- Abilities ---------- */
   .ability-card{
@@ -458,6 +491,8 @@
     border:1px solid var(--line); color:var(--text); font-size:14px; font-weight:600; text-align:left; display:flex; align-items:center; gap:10px;
   }
   .action-menu-btn:active{ background:var(--ink); }
+  .picker-icon{ width:40px; height:40px; border-radius:8px; object-fit:cover; flex-shrink:0; border:1px solid var(--gold); box-shadow:0 2px 6px rgba(0,0,0,.4); }
+  .picker-label-text{ flex:1; min-width:0; }
   .mode-banner{
     display:none; align-items:center; justify-content:space-between; gap:10px; padding:9px 12px; margin-bottom:10px;
     background:rgba(201,154,63,.12); border:1px solid var(--gold); border-radius:8px; font-size:12px; color:var(--gold-bright);
@@ -611,6 +646,11 @@
 
         <div class="wm-event-banner" id="wm-event-banner">
           <span id="wm-event-banner-text"></span>
+          <div id="wm-chest-give-wrap" style="display:none; flex-direction:column; gap:6px; width:100%;">
+            <select id="wm-chest-tier-select" style="width:100%; font-size:12px; padding:6px; background:var(--ink-2); border:1px solid var(--gold); border-radius:6px; color:var(--text);"></select>
+            <select id="wm-chest-player-select" style="width:100%; font-size:12px; padding:6px; background:var(--ink-2); border:1px solid var(--gold); border-radius:6px; color:var(--text);"></select>
+            <button id="wm-chest-give-btn" class="primary-btn" style="width:100%;">Sandığı Ver</button>
+          </div>
           <button id="wm-event-banner-close">Kapat</button>
         </div>
 
@@ -646,6 +686,10 @@
       </div>
 
       <div id="inv-tab">
+        <div class="shared-gold-banner" id="shared-gold-banner">
+          <span>💰 Parti Ortak Hazinesi</span>
+          <input id="shared-gold-input" type="number" min="0">
+        </div>
         <div class="dice-char-row" id="inv-subtab-row" style="display:none;"></div>
         <div class="dice-char-row" id="inv-char-row"></div>
         <div id="equip-slots"></div>
@@ -803,11 +847,83 @@
       <label>Renk</label>
       <div class="color-row" id="npcm-colors"></div>
     </div>
+    <div id="npcm-buyprefs-wrap" style="display:none;">
+      <div class="field">
+        <label>Ne tür eşya satın alır?</label>
+        <select id="npcm-buytype">
+          <option value="hepsi">Hepsi</option>
+          <option value="kullanilabilir">Kullanılabilir</option>
+          <option value="malzeme">Malzeme</option>
+          <option value="diger">Diğer</option>
+          <option value="giyilebilir">Giyilebilir</option>
+        </select>
+      </div>
+      <div class="field" id="npcm-wearsub-row" style="display:none;">
+        <label>Giyilebilir Türü</label>
+        <select id="npcm-wearsub">
+          <option value="hepsi">Hepsi</option>
+          <option value="silahlar">Silahlar</option>
+          <option value="zirhlar">Zırhlar</option>
+          <option value="ziynetler">Ziynetler</option>
+        </select>
+      </div>
+      <div class="field" id="npcm-armorslot-row" style="display:none;">
+        <label>Zırh Alt Türü</label>
+        <select id="npcm-armorslot">
+          <option value="hepsi">Hepsi</option>
+          <option value="Kafalık">Miğfer</option>
+          <option value="Ayakkabı">Ayakkabı</option>
+          <option value="Eldiven">Eldiven</option>
+          <option value="Zırh">Göğüslük</option>
+        </select>
+      </div>
+      <div class="field" id="npcm-jewelslot-row" style="display:none;">
+        <label>Ziynet Alt Türü</label>
+        <select id="npcm-jewelslot">
+          <option value="hepsi">Hepsi</option>
+          <option value="Yüzük">Yüzükler</option>
+          <option value="Kolye">Nazarlık (Kolye)</option>
+        </select>
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="ghost-btn" id="npcm-cancel">Vazgeç</button>
       <button class="primary-btn" id="npcm-save">Ekle</button>
     </div>
   </div>
+</div>
+
+<!-- SHOP SCREEN -->
+<div class="sheet-overlay" id="shop-screen">
+  <div class="sheet-header">
+    <button id="shop-back">‹ Geri</button>
+    <div class="sheet-header-title" id="shop-header-title">DÜKKAN</div>
+    <div style="width:40px"></div>
+  </div>
+  <div class="sheet-body">
+    <div class="shared-gold-banner"><span>💰 Ortak Hazine</span><span id="shop-gold-line">-</span></div>
+    <div class="field" id="shop-buyer-row">
+      <label>Karakter</label>
+      <select id="shop-buyer-select"></select>
+    </div>
+    <div class="dice-char-row">
+      <button class="dice-char-chip active" id="shop-mode-buy">🛍 Satın Al</button>
+      <button class="dice-char-chip" id="shop-mode-sell">💱 Sat</button>
+    </div>
+    <div id="shop-buy-list"></div>
+    <div id="shop-sell-list" style="display:none;"></div>
+    <button class="ghost-btn" id="btn-shop-add-item" style="display:none; width:100%; margin-top:10px;">📦 Kütüphaneden Ürün Ekle</button>
+  </div>
+</div>
+
+<!-- SHOP ITEM DETAIL -->
+<div class="sheet-overlay" id="shop-item-detail-screen">
+  <div class="sheet-header">
+    <button id="shop-item-back">‹ Geri</button>
+    <div class="sheet-header-title">EŞYA DETAYI</div>
+    <div style="width:40px"></div>
+  </div>
+  <div class="sheet-body" id="shop-item-detail-body"></div>
 </div>
 
 <!-- CHARACTER SHEET -->
@@ -841,15 +957,18 @@
         <div class="stat-box"><label>Maks Mana</label><div id="calc-maxmp">-</div></div>
         <div class="stat-box"><label>Hız</label><div id="calc-speed">-</div></div>
       </div>
-      <div class="field-row">
-        <div class="field"><label>Can Bonusu</label><input id="sheet-hpbonus" type="number"></div>
-        <div class="field"><label>Mana Bonusu</label><input id="sheet-manabonus" type="number"></div>
+      <h3 class="sheet-section-title collapsible" id="sheet-sec-h-bonus">BONUSLAR <span class="sec-arrow">▾</span></h3>
+      <div id="sheet-sec-bonus">
+        <div class="field-row">
+          <div class="field"><label>Can Bonusu</label><input id="sheet-hpbonus" type="number"></div>
+          <div class="field"><label>Mana Bonusu</label><input id="sheet-manabonus" type="number"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>😴 Yorgunluk</label><input id="sheet-fatigue" type="number" min="0"></div>
+          <div class="field"><label>Zar Cezası</label><div id="sheet-fatigue-penalty" class="calc-hint" style="margin-top:10px;">-</div></div>
+        </div>
+        <p class="calc-hint">Maks Can = Seviye + Direnç + Can Bonusu · Maks Mana = Seviye + İrade + Mana Bonusu · Hız = 2 + (Çeviklik ÷ 2) · Her 2 yorgunlukta tüm zarlara -1</p>
       </div>
-      <div class="field-row">
-        <div class="field"><label>😴 Yorgunluk</label><input id="sheet-fatigue" type="number" min="0"></div>
-        <div class="field"><label>Zar Cezası</label><div id="sheet-fatigue-penalty" class="calc-hint" style="margin-top:10px;">-</div></div>
-      </div>
-      <p class="calc-hint">Maks Can = Seviye + Direnç + Can Bonusu · Maks Mana = Seviye + İrade + Mana Bonusu · Hız = 2 + (Çeviklik ÷ 2) · Her 2 yorgunlukta tüm zarlara -1</p>
     </div>
 
     <div id="creature-stat-block" style="display:none;">
@@ -859,29 +978,39 @@
       </div>
     </div>
 
-    <h3 class="sheet-section-title" style="margin-top:22px;">SAVAŞ AYARLARI</h3>
-    <div id="melee-settings-row" class="field-row">
-      <div class="field"><label>Düz Vuruş Menzili</label><input id="sheet-meleerange" type="number" min="1"></div>
-      <div class="field"><label>Düz Hasar Bonusu</label><input id="sheet-meleedmg" type="number"></div>
+    <h3 class="sheet-section-title collapsible" id="sheet-sec-h-combat" style="margin-top:22px;">SAVAŞ AYARLARI <span class="sec-arrow">▾</span></h3>
+    <div id="sheet-sec-combat">
+      <div id="melee-settings-row" class="field-row">
+        <div class="field"><label>Düz Vuruş Menzili</label><input id="sheet-meleerange" type="number" min="1"></div>
+        <div class="field"><label>Düz Hasar Bonusu</label><input id="sheet-meleedmg" type="number"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Fiziksel AC <span class="effective-hint" id="ac-phys-effective"></span></label><input id="sheet-acphys" type="number"></div>
+        <div class="field"><label>Büyüsel AC <span class="effective-hint" id="ac-mag-effective"></span></label><input id="sheet-acmag" type="number"></div>
+      </div>
+      <div class="field">
+        <label>Hareket Türü</label>
+        <select id="sheet-movement">
+          <option value="karasal">Karasal (varsayılan)</option>
+          <option value="deniz">Deniz Canlısı</option>
+          <option value="ucan">Uçabilen</option>
+        </select>
+      </div>
+      <p class="calc-hint" id="melee-calc-hint">Düz Vuruş Hasarı = 1 + Düz Hasar Bonusu · Menzil 1 ise Yakın Dövüş, 2+ ise Atıcılık zarı atılır.</p>
+      <p class="calc-hint">Yetenekleri alttaki "Yetenekler" sekmesinden düzenleyebilirsin.</p>
     </div>
-    <div class="field-row">
-      <div class="field"><label>Fiziksel AC <span class="effective-hint" id="ac-phys-effective"></span></label><input id="sheet-acphys" type="number"></div>
-      <div class="field"><label>Büyüsel AC <span class="effective-hint" id="ac-mag-effective"></span></label><input id="sheet-acmag" type="number"></div>
-    </div>
-    <div class="field">
-      <label>Hareket Türü</label>
-      <select id="sheet-movement">
-        <option value="karasal">Karasal (varsayılan)</option>
-        <option value="deniz">Deniz Canlısı</option>
-        <option value="ucan">Uçabilen</option>
-      </select>
-    </div>
-    <p class="calc-hint" id="melee-calc-hint">Düz Vuruş Hasarı = 1 + Düz Hasar Bonusu · Menzil 1 ise Yakın Dövüş, 2+ ise Atıcılık zarı atılır.</p>
-    <p class="calc-hint">Yetenekleri alttaki "Yetenekler" sekmesinden düzenleyebilirsin.</p>
 
-    <h3 class="sheet-section-title" style="margin-top:22px;">ÖZELLİKLER</h3>
-    <div id="skills-list"></div>
-    <button class="ghost-btn" id="btn-add-skill">+ Yeni Alan Ekle</button>
+    <h3 class="sheet-section-title collapsible" id="sheet-sec-h-skills" style="margin-top:22px;">ÖZELLİKLER <span class="sec-arrow">▾</span></h3>
+    <div id="sheet-sec-skills">
+      <div id="skill-points-info" class="calc-hint" style="display:none; font-weight:700; color:var(--gold-bright); margin-bottom:6px;"></div>
+      <div id="skills-list"></div>
+      <button class="ghost-btn" id="btn-add-skill">+ Yeni Alan Ekle</button>
+    </div>
+
+    <h3 class="sheet-section-title collapsible" id="sheet-sec-h-relation" style="margin-top:22px; display:none;">İLİŞKİ <span class="sec-arrow">▾</span></h3>
+    <div id="sheet-sec-relation" style="display:none;">
+      <div id="npc-relation-hearts" class="npc-hearts"></div>
+    </div>
   </div>
 </div>
 
@@ -895,6 +1024,10 @@
   <div class="sheet-body">
     <div class="field"><label>İsim</label><input id="ie-name" type="text" maxlength="30"></div>
     <div class="field">
+      <label>İkon / Resim</label>
+      <div id="ie-icon-wrap"></div>
+    </div>
+    <div class="field">
       <label>Tür</label>
       <select id="ie-type"></select>
     </div>
@@ -905,6 +1038,11 @@
     <div class="field">
       <label>Kalite</label>
       <div class="quality-row" id="ie-quality-row"></div>
+    </div>
+    <div class="field"><label>Değer (Para) — ileride alım-satım için</label><input id="ie-value" type="number" min="0" step="1"></div>
+    <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
+      <input type="checkbox" id="ie-no-chest" style="width:18px; height:18px;">
+      <label style="margin:0;" for="ie-no-chest">Sandıktan düşemez</label>
     </div>
 
     <h3 class="sheet-section-title" style="margin-top:20px;">HEDEF</h3>
@@ -969,6 +1107,24 @@
     {key:'turuncu',  label:'Efsanevi',  color:'#e2632a'},
     {key:'kirmizi',  label:'Kadim',     color:'#c1440e'}
   ];
+  // Sandık türleri: her biri para (zar ifadesi ya da sabit) + Kullanılabilir slotları + herhangi tür slotları tanımlar
+  const CHEST_TIERS = [
+    { key:'beyaz',   label:'Değersiz Sandık', goldDice:'3d10',
+      usableSlots:[ {qualities:['beyaz']} ], anySlots:[ {qualities:['beyaz']} ] },
+    { key:'yesil',   label:'Yaygın Sandık',   goldDice:'5d10',
+      usableSlots:[ {qualities:['beyaz']}, {qualities:['yesil']} ], anySlots:[ {qualities:['beyaz','yesil']} ] },
+    { key:'mavi',    label:'Nadir Sandık',    goldDice:'7d10',
+      usableSlots:[ {qualities:['yesil']}, {qualities:['mavi']} ], anySlots:[ {qualities:['yesil','mavi']} ] },
+    { key:'pembe',   label:'Epik Sandık',     goldDice:'9d10',
+      usableSlots:[ {qualities:['mavi']}, {qualities:['pembe']} ], anySlots:[ {qualities:['mavi','pembe']} ] },
+    { key:'turuncu', label:'Efsanevi Sandık', goldFlat:80,
+      usableSlots:[ {qualities:['pembe']}, {qualities:['turuncu','pembe']} ], anySlots:[ {qualities:['turuncu','pembe']} ] },
+    { key:'kirmizi', label:'Kadim Sandık',    goldFlat:150,
+      usableSlots:[ {qualities:['turuncu']}, {qualities:['turuncu']} ], anySlots:[ {qualities:['turuncu','kirmizi']} ] }
+  ];
+  function chestTierDef(key){ return CHEST_TIERS.find(c => c.key===key) || CHEST_TIERS[0]; }
+  // Yaratık loot şans kademeleri: 1.kademe %20, her kademe +%10
+  const LOOT_CHANCE_BY_TIER = [20, 40, 60, 80, 100];
   const EFFECT_DEFS = {
     none:     { label:'Yok', params:[] },
     damage:   { label:'Hasar', params:[
@@ -1022,9 +1178,54 @@
                   {key:'amount', label:'Miktar', type:'number'} ] }
   };
   function blankEffect(){ return {type:'none', params:{}}; }
+
+  // ---------- Genel ikon/resim seçici (yetenek ve eşya kartlarında kullanılır) ----------
+  function buildIconPicker(currentUrl, editable, onPick){
+    const wrap = document.createElement('div');
+    wrap.className = 'icon-pick-wrap';
+    if(currentUrl){
+      const img = document.createElement('img');
+      img.src = currentUrl;
+      wrap.appendChild(img);
+    } else {
+      const ph = document.createElement('span');
+      ph.className = 'icon-pick-placeholder';
+      ph.textContent = '🖼️';
+      wrap.appendChild(ph);
+    }
+    if(editable){
+      wrap.style.cursor = 'pointer';
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file'; fileInput.accept = 'image/*'; fileInput.style.display = 'none';
+      fileInput.onchange = (ev) => {
+        const file = ev.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const image = new Image();
+          image.onload = () => {
+            const s = 128;
+            const canvas = document.createElement('canvas');
+            canvas.width = s; canvas.height = s;
+            const ctx = canvas.getContext('2d');
+            const scale = Math.max(s/image.width, s/image.height);
+            const w = image.width*scale, h = image.height*scale;
+            ctx.drawImage(image, (s-w)/2, (s-h)/2, w, h);
+            onPick(canvas.toDataURL('image/jpeg', 0.8));
+          };
+          image.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+        ev.target.value = '';
+      };
+      wrap.appendChild(fileInput);
+      wrap.onclick = () => fileInput.click();
+    }
+    return wrap;
+  }
   function blankItemTemplate(){
     return { id:'it'+Date.now()+Math.floor(Math.random()*999), name:'Yeni Eşya', type:'Diğer', quality:'beyaz',
-      targetMode:'self', range:1, shape:'1x1', equipSlot:'Silah',
+      targetMode:'self', range:1, shape:'1x1', equipSlot:'Silah', icon:null, noChestDrop:false, value:0,
       effects:[blankEffect(), blankEffect(), blankEffect()] };
   }
   // ---------- Zemin (terrain) sistemi ----------
@@ -1331,7 +1532,7 @@
     if(typeof firebase === 'undefined' || !fbDb){ setupError('Veritabanına bağlanılamadı — internet bağlantını kontrol et.'); return; }
     const code = genCode();
     me.name = name; me.code = code; me.role = 'dm'; // oda kuran kişi Zindan Ustası olur
-    const fresh = { code, tokens:[], npcs:[], activeTokenId:null, turnOrder:[], rollLog:[], itemTemplates:[], terrain:{}, roundNumber:1, updatedAt: Date.now() };
+    const fresh = { code, tokens:[], npcs:[], activeTokenId:null, turnOrder:[], rollLog:[], itemTemplates:[], terrain:{}, roundNumber:1, groundLoot:[], gold:0, shops:[], updatedAt: Date.now() };
     try{
       await fbDb.ref('sessions/'+code).set(fresh);
       session = fresh;
@@ -1567,6 +1768,16 @@
     if(t.hp == null) t.hp = getMaxHp(t);
     if(t.mp == null) t.mp = getMaxMp(t);
     if(t.kind!=='creature' && t.fatigue == null) t.fatigue = 0;
+    if(t.kind==='character' && t.skillPoints == null) t.skillPoints = 0;
+    // Not: para artık karakter bazlı değil, ortak havuz (session.gold) olarak tutuluyor
+    if(t.kind==='creature'){
+      if(t.dropsLoot == null) t.dropsLoot = false;
+      if(t.lootTier == null) t.lootTier = 1;
+      if(!t.lootType) t.lootType = 'esya';
+      if(t.lootItemTemplateId === undefined) t.lootItemTemplateId = null;
+      if(!t.lootChestTier) t.lootChestTier = 'beyaz';
+    }
+    if(t.kind==='npc' && t.relation == null) t.relation = 5;
   }
 
   // ---------- Render ----------
@@ -1582,6 +1793,9 @@
     if(!session.worldMap) session.worldMap = { terrain:{}, party:{ row:4, col:10, travelRemaining:0 } };
     if(!session.worldMap.terrain) session.worldMap.terrain = {};
     if(!session.worldMap.party) session.worldMap.party = { row:4, col:10, travelRemaining:0 };
+    if(!session.groundLoot) session.groundLoot = [];
+    if(!session.shops) session.shops = [];
+    if(session.gold == null) session.gold = 0;
     renderTurnBanner();
     renderGrid();
     renderCharList();
@@ -1841,7 +2055,27 @@
 
   function renderGrid(){
     const grid = $('grid');
-    grid.querySelectorAll('.token, .cell-range, .terrain-cell').forEach(el => el.remove());
+    grid.querySelectorAll('.token, .cell-range, .terrain-cell, .ground-loot').forEach(el => el.remove());
+
+    // yerde duran loot (sandık ya da eşya) katmanı — yaratık öldüğünde düşen loot
+    (session.groundLoot||[]).forEach(g => {
+      let color = 'var(--gold)', label = 'Loot';
+      if(g.isChest){
+        const def = chestTierDef(g.chestTier);
+        color = def.color; label = def.label;
+      } else {
+        const tpl = (session.itemTemplates||[]).find(x=>x.id===g.itemTemplateId);
+        if(tpl){ color = qualityOf(tpl.quality).color; label = tpl.name; }
+      }
+      const el = document.createElement('div');
+      el.className = 'ground-loot';
+      el.style.left = (g.col*CELL)+'px'; el.style.top = (g.row*CELL)+'px';
+      el.style.width = CELL+'px'; el.style.height = CELL+'px';
+      el.style.borderColor = color;
+      el.title = label;
+      el.textContent = '🎁';
+      grid.appendChild(el);
+    });
 
     // zemin (terrain) alt katmani her zaman gosterilir
     Object.keys(session.terrain||{}).forEach(key => {
@@ -2328,11 +2562,32 @@
         applyElementEffect(t, def.element, def.label);
       }
     }
+    if(t.kind === 'character') pickUpGroundLoot(t, row, col);
     await pushRemote();
     renderAll();
     flashToken(id);
     flushFloatingNumbers();
   }
+
+  // Yerde duran bir sandık varsa (sadece oyuncu karakterleri tetikler, yaratıklar/Enemy'ler değil) envantere alır.
+  function pickUpGroundLoot(t, row, col){
+    session.groundLoot = session.groundLoot || [];
+    const idx = session.groundLoot.findIndex(g => g.row===row && g.col===col);
+    if(idx < 0) return;
+    const loot = session.groundLoot[idx];
+    session.groundLoot.splice(idx, 1);
+    if(loot.isChest){
+      addItemToInventory(t, makeChestItem(loot.chestTier));
+      logSystemEvent(t.name + ' yerdeki ' + chestTierDef(loot.chestTier).label + '\u2019\u0131 ald\u0131.');
+    } else {
+      const tpl = (session.itemTemplates||[]).find(x=>x.id===loot.itemTemplateId);
+      if(tpl){
+        addItemToInventory(t, cloneTemplateAsItem(tpl));
+        logSystemEvent(t.name + ' yerdeki ' + tpl.name + '\u2019i ald\u0131.');
+      }
+    }
+  }
+
 
   function flashToken(id){
     setTimeout(() => {
@@ -2454,7 +2709,7 @@
     options.forEach(opt => {
       const b = document.createElement('button');
       b.className = 'action-menu-btn';
-      b.innerHTML = opt.label;
+      b.innerHTML = (opt.icon ? '<img class="picker-icon" src="'+opt.icon+'">' : '') + '<span class="picker-label-text">'+opt.label+'</span>';
       b.disabled = !!opt.disabled;
       if(opt.disabled) b.style.opacity = '.5';
       b.onclick = () => { $('picker-backdrop').classList.remove('open'); onPick(opt.value); };
@@ -2473,7 +2728,7 @@
       const resourceMissing = actType==='action' ? (res.action===false) : (actType==='bonus' ? (res.bonus===false) : false);
       return {
         label: '<b>'+esc(a.name)+'</b> <span class="n">'+typeLabel+' · '+a.manaCost+' mana · menzil '+a.range+'</span>',
-        value: a,
+        value: a, icon: a.icon || null,
         disabled: ((t.mp||0) < (a.manaCost||0)) || resourceMissing
       };
     });
@@ -2486,7 +2741,7 @@
 
   function openItemPicker(t){
     const items = (t.inventory||[]).filter(i => (i.tag||'').trim().toLocaleUpperCase('tr') === 'KULLANILABİLİR');
-    const opts = items.map(i => ({ label: '<b>'+esc(i.name)+'</b>' + ((i.qty||1)>1 ? ' <span class="n">×'+i.qty+'</span>' : '') + (i.targetMode==='target' ? ' <span class="n">(Hedefe Etki)</span>' : ''), value: i }));
+    const opts = items.map(i => ({ label: '<b>'+esc(i.name)+'</b>' + ((i.qty||1)>1 ? ' <span class="n">×'+i.qty+'</span>' : '') + (i.targetMode==='target' ? ' <span class="n">(Hedefe Etki)</span>' : ''), value: i, icon: i.icon || null }));
     openPicker('Eşya Kullan', opts, (item) => {
       if(item.targetMode === 'target'){
         pendingItem = item;
@@ -2628,8 +2883,9 @@
     else { queueFloat(t.id, t.mp - before, 'mp'); flushFloatingNumbers(); }
   }
 
-  function checkDeath(t){
+  function checkDeath(t, killer){
     if(t.kind==='creature' && t.inBattle && t.hp<=0){
+      handleCreatureDeathLoot(t);
       playDeathAnimation(t.id);
     } else if(t.kind!=='creature' && t.hp<=0){
       checkRevive(t);
@@ -2776,6 +3032,7 @@
   ];
   const NPC_FOLDERS = [
     {id:'tuccar', label:'🛒 Tüccarlar'},
+    {id:'dukkan', label:'🏪 Dükkanlar'},
     {id:'diger',  label:'📜 Diğer'}
   ];
 
@@ -2790,7 +3047,9 @@
     $('npc-folder-list').style.display = npcView==='folders' ? 'flex' : 'none';
     $('npc-folder-list').className = 'npc-folder-row';
     $('npc-char-list').style.display = npcView==='list' ? 'block' : 'none';
+    const isShopFolder = npcFolderId === 'dukkan';
     $('btn-add-npc').style.display = (npcView==='list' && me.role==='dm') ? 'block' : 'none';
+    $('btn-add-npc').textContent = isShopFolder ? '+ Dükkan Ekle' : '+ NPC Ekle';
 
     const crumb = $('npc-breadcrumb');
     if(npcView==='cities'){
@@ -2806,6 +3065,7 @@
 
     if(npcView==='cities') renderNpcCityGrid();
     else if(npcView==='folders') renderNpcFolders();
+    else if(isShopFolder) renderShopFolderList();
     else renderNpcCharList();
   }
 
@@ -2900,7 +3160,253 @@
     renderNpcTab();
   }
 
-  $('btn-add-npc').onclick = () => openNpcModal();
+  // ---------- Dükkan (shop) sistemi ----------
+  function renderShopFolderList(){
+    const wrap = $('npc-char-list');
+    wrap.innerHTML = '';
+    const shops = (session.shops||[]).filter(s => s.cityId === npcCityId);
+    if(shops.length === 0){
+      const p = document.createElement('p');
+      p.style.color='var(--text-dim)'; p.style.fontSize='13px'; p.style.textAlign='center';
+      p.textContent = 'Bu şehirde henüz dükkan yok.';
+      wrap.appendChild(p);
+    }
+    shops.forEach(shop => {
+      const merchant = session.npcs.find(n=>n.id===shop.merchantNpcId);
+      const card = document.createElement('div');
+      card.className = 'char-card npc-card';
+      card.onclick = () => openShopScreen(shop.id);
+      const av = document.createElement('div');
+      av.className = 'char-avatar'; applyAvatar(av, merchant||{color:'#8a5aa6'});
+      const info = document.createElement('div');
+      info.className = 'char-info';
+      const nameRow = document.createElement('div'); nameRow.className='name'; nameRow.textContent = (merchant?merchant.name:'?') + ' Dükkanı';
+      const classLine = document.createElement('div'); classLine.className='class-line'; classLine.textContent = (shop.itemTemplateIds||[]).length + ' ürün';
+      info.appendChild(nameRow); info.appendChild(classLine);
+      card.appendChild(av); card.appendChild(info);
+      if(me.role==='dm'){
+        const rm = document.createElement('button');
+        rm.className='rm-btn'; rm.textContent='✕';
+        rm.onclick = async (ev) => { ev.stopPropagation(); session.shops = session.shops.filter(s=>s.id!==shop.id); await pushRemote(); renderShopFolderList(); };
+        card.appendChild(rm);
+      }
+      wrap.appendChild(card);
+    });
+  }
+
+  function openAddShopPicker(){
+    const merchants = session.npcs.filter(n => n.cityId===npcCityId && n.category==='tuccar' && !(session.shops||[]).some(s=>s.merchantNpcId===n.id));
+    const opts = merchants.map(n => ({ label: esc(n.name), value: n }));
+    openPicker('Burası Kimin Dükkanı?', opts, async (merchant) => {
+      const shop = { id:'shop'+Date.now()+Math.floor(Math.random()*999), cityId: npcCityId, merchantNpcId: merchant.id, itemTemplateIds: [] };
+      session.shops.push(shop);
+      await pushRemote();
+      renderShopFolderList();
+      openShopScreen(shop.id);
+    }, 'Bu şehirde önce Tüccarlar klasöründen bir tüccar eklemelisin.');
+  }
+
+  function itemMatchesBuyPrefs(npc, item){
+    const p = (npc && npc.buyPrefs) || {type:'hepsi'};
+    if(p.type === 'hepsi') return true;
+    if(p.type === 'kullanilabilir') return item.tag === 'Kullanılabilir';
+    if(p.type === 'malzeme') return item.tag === 'Malzeme';
+    if(p.type === 'diger') return item.tag === 'Diğer' || item.tag === 'Ivır Zıvır';
+    if(p.type === 'giyilebilir'){
+      if(item.tag !== 'Giyilebilir') return false;
+      if(!p.wearSubtype || p.wearSubtype==='hepsi') return true;
+      if(p.wearSubtype === 'silahlar') return item.equipSlot === 'Silah';
+      if(p.wearSubtype === 'zirhlar') return ['Kafalık','Ayakkabı','Eldiven','Zırh'].includes(item.equipSlot) && (!p.armorSlot || p.armorSlot==='hepsi' || p.armorSlot===item.equipSlot);
+      if(p.wearSubtype === 'ziynetler') return ['Yüzük','Kolye'].includes(item.equipSlot) && (!p.jewelSlot || p.jewelSlot==='hepsi' || p.jewelSlot===item.equipSlot);
+    }
+    return false;
+  }
+
+  function computeShopBuyPrice(baseValue, relation){
+    const diff = (relation==null?5:relation) - 5;
+    const mult = Math.max(0, 1 - diff*0.10);
+    return Math.max(0, Math.round((baseValue||0) * mult));
+  }
+  function computeShopSellPercent(relation){
+    const diff = (relation==null?5:relation) - 5;
+    return Math.max(1, 25 + diff*5);
+  }
+
+  let shopScreenShopId = null;
+  let shopMode = 'buy';
+
+  function myOwnCharacter(){
+    return session.tokens.find(t => t.kind==='character' && t.owner===me.name);
+  }
+
+  function openShopScreen(shopId){
+    shopScreenShopId = shopId;
+    shopMode = 'buy';
+    const buyerSel = $('shop-buyer-select');
+    buyerSel.innerHTML = '';
+    session.tokens.filter(t=>t.kind==='character').forEach(t => {
+      const o = document.createElement('option'); o.value=t.id; o.textContent=t.name;
+      buyerSel.appendChild(o);
+    });
+    const mine = myOwnCharacter();
+    if(mine) buyerSel.value = mine.id;
+    renderShopScreen();
+    $('shop-screen').classList.add('open');
+  }
+  $('shop-back').onclick = () => { $('shop-screen').classList.remove('open'); shopScreenShopId = null; };
+  $('shop-buyer-select').onchange = () => renderShopScreen();
+  $('shop-mode-buy').onclick = () => { shopMode='buy'; renderShopScreen(); };
+  $('shop-mode-sell').onclick = () => { shopMode='sell'; renderShopScreen(); };
+
+  function renderShopScreen(){
+    const shop = (session.shops||[]).find(s=>s.id===shopScreenShopId);
+    if(!shop) return;
+    const merchant = session.npcs.find(n=>n.id===shop.merchantNpcId);
+    $('shop-header-title').textContent = (merchant?merchant.name:'?') + ' Dükkanı';
+    $('shop-gold-line').textContent = (session.gold||0) + ' 💰';
+    $('shop-mode-buy').classList.toggle('active', shopMode==='buy');
+    $('shop-mode-sell').classList.toggle('active', shopMode==='sell');
+    $('shop-buy-list').style.display = shopMode==='buy' ? 'block' : 'none';
+    $('shop-sell-list').style.display = shopMode==='sell' ? 'block' : 'none';
+    $('btn-shop-add-item').style.display = (shopMode==='buy' && me.role==='dm') ? 'block' : 'none';
+
+    const relation = merchant ? (merchant.relation==null?5:merchant.relation) : 5;
+    const buyer = session.tokens.find(t=>t.id===$('shop-buyer-select').value);
+
+    if(shopMode === 'buy'){
+      const wrap = $('shop-buy-list');
+      wrap.innerHTML = '';
+      const tpls = (shop.itemTemplateIds||[]).map(id => (session.itemTemplates||[]).find(x=>x.id===id)).filter(Boolean);
+      if(tpls.length===0){
+        const p = document.createElement('p'); p.style.color='var(--text-dim)'; p.style.fontSize='13px'; p.style.textAlign='center';
+        p.textContent = 'Dükkanda henüz ürün yok.'; wrap.appendChild(p);
+      }
+      tpls.forEach(tpl => {
+        const price = computeShopBuyPrice(tpl.value||0, relation);
+        const q = qualityOf(tpl.quality);
+        const card = document.createElement('div');
+        card.className = 'item-tpl-card'; card.style.borderLeftColor = q.color;
+        card.onclick = () => openShopItemDetail({mode:'buy', tpl, shop, price, buyer});
+        if(tpl.icon){ const th=document.createElement('img'); th.src=tpl.icon; th.className='picker-icon'; th.style.width='36px'; th.style.height='36px'; card.appendChild(th); }
+        const info = document.createElement('div'); info.className='tpl-info';
+        const nm = document.createElement('div'); nm.className='tpl-name'; nm.textContent = tpl.name;
+        const meta = document.createElement('div'); meta.className='tpl-meta'; meta.textContent = '💰 ' + price;
+        info.appendChild(nm); info.appendChild(meta);
+        card.appendChild(info);
+        wrap.appendChild(card);
+      });
+    } else {
+      const wrap = $('shop-sell-list');
+      wrap.innerHTML = '';
+      if(!buyer){ wrap.innerHTML=''; return; }
+      const sellable = (buyer.inventory||[]).filter(i => !i.isChest && itemMatchesBuyPrefs(merchant, i));
+      if(sellable.length===0){
+        const p = document.createElement('p'); p.style.color='var(--text-dim)'; p.style.fontSize='13px'; p.style.textAlign='center';
+        p.textContent = 'Satabileceğin (bu tüccarın kabul ettiği türde) eşyan yok.'; wrap.appendChild(p);
+      }
+      const sellPercent = computeShopSellPercent(relation);
+      sellable.forEach(item => {
+        const price = Math.max(0, Math.round((item.value||0) * sellPercent/100));
+        const q = item.quality ? qualityOf(item.quality) : null;
+        const card = document.createElement('div');
+        card.className = 'item-tpl-card'; if(q) card.style.borderLeftColor = q.color;
+        card.onclick = () => openShopItemDetail({mode:'sell', item, shop, price, buyer, sellPercent});
+        if(item.icon){ const th=document.createElement('img'); th.src=item.icon; th.className='picker-icon'; th.style.width='36px'; th.style.height='36px'; card.appendChild(th); }
+        const info = document.createElement('div'); info.className='tpl-info';
+        const nm = document.createElement('div'); nm.className='tpl-name'; nm.textContent = item.name + ((item.qty||1)>1?' ×'+item.qty:'');
+        const meta = document.createElement('div'); meta.className='tpl-meta'; meta.textContent = '💰 ' + price + ' (%' + sellPercent + ')';
+        info.appendChild(nm); info.appendChild(meta);
+        card.appendChild(info);
+        wrap.appendChild(card);
+      });
+    }
+  }
+
+  $('btn-shop-add-item').onclick = () => {
+    const shop = (session.shops||[]).find(s=>s.id===shopScreenShopId);
+    if(!shop) return;
+    libPickerMode = 'shopConfig'; libPickerShopId = shop.id;
+    libTypeFilter='Hepsi'; libSlotFilter='Hepsi'; libQualityFilter='Hepsi';
+    renderLibraryPicker(null);
+    $('library-picker-backdrop').classList.add('open');
+  };
+
+  function openShopItemDetail(ctx){
+    const body = $('shop-item-detail-body');
+    body.innerHTML = '';
+    const isBuy = ctx.mode === 'buy';
+    const obj = isBuy ? ctx.tpl : ctx.item;
+    if(obj.icon){
+      const img = document.createElement('img'); img.src=obj.icon; img.style.width='96px'; img.style.height='96px';
+      img.style.borderRadius='12px'; img.style.display='block'; img.style.margin='0 auto 14px';
+      body.appendChild(img);
+    }
+    const nm = document.createElement('h2'); nm.style.textAlign='center'; nm.style.fontFamily="'Cinzel',serif"; nm.style.color='var(--gold-bright)';
+    nm.textContent = obj.name; body.appendChild(nm);
+    if(obj.quality){
+      const q = qualityOf(obj.quality);
+      const qb = document.createElement('div'); qb.style.textAlign='center'; qb.style.color=q.color; qb.style.fontWeight='700'; qb.style.marginBottom='10px';
+      qb.textContent = q.label; body.appendChild(qb);
+    }
+    const typeLine = document.createElement('p'); typeLine.className='calc-hint'; typeLine.style.textAlign='center';
+    typeLine.textContent = (obj.tag||obj.type||'') + (obj.equipSlot && (obj.tag==='Giyilebilir') ? ' · '+obj.equipSlot : '');
+    body.appendChild(typeLine);
+    const effectNames = (obj.effects||[]).filter(e=>e&&e.type!=='none').map(e=>EFFECT_DEFS[e.type]?EFFECT_DEFS[e.type].label:e.type);
+    if(effectNames.length){
+      const eff = document.createElement('p'); eff.className='calc-hint'; eff.style.textAlign='center';
+      eff.textContent = 'Efektler: ' + effectNames.join(', '); body.appendChild(eff);
+    }
+    const priceLine = document.createElement('div'); priceLine.style.textAlign='center'; priceLine.style.fontSize='22px'; priceLine.style.fontWeight='800';
+    priceLine.style.color='var(--gold-bright)'; priceLine.style.margin='16px 0'; priceLine.textContent = '💰 ' + ctx.price;
+    body.appendChild(priceLine);
+    const btn = document.createElement('button'); btn.className='primary-btn'; btn.style.width='100%';
+    btn.textContent = isBuy ? 'Satın Al' : 'Sat';
+    btn.onclick = async () => {
+      if(!ctx.buyer){ alert('Önce bir karakter seç.'); return; }
+      if(isBuy){
+        if((session.gold||0) < ctx.price){ alert('Ortak hazinede yeterli altın yok.'); return; }
+        session.gold -= ctx.price;
+        addItemToInventory(ctx.buyer, cloneTemplateAsItem(ctx.tpl));
+        logSystemEvent(ctx.buyer.name + ', ' + ctx.tpl.name + ' satın aldı (-' + ctx.price + ' 💰).');
+      } else {
+        if((ctx.item.qty||1) > 1) ctx.item.qty -= 1;
+        else ctx.buyer.inventory = (ctx.buyer.inventory||[]).filter(i=>i.id!==ctx.item.id);
+        session.gold = (session.gold||0) + ctx.price;
+        logSystemEvent(ctx.buyer.name + ', ' + ctx.item.name + ' sattı (+' + ctx.price + ' 💰).');
+      }
+      await pushRemote();
+      $('shop-item-detail-screen').classList.remove('open');
+      renderShopScreen();
+    };
+    body.appendChild(btn);
+    $('shop-item-detail-screen').classList.add('open');
+  }
+  $('shop-item-back').onclick = () => $('shop-item-detail-screen').classList.remove('open');
+
+  // Oyuncular için: haritada yakınına gelinen şehirdeki NPC/dükkanları salt-okunur gezme
+  function openPlayerCityBrowser(cityId){
+    const city = NPC_CITIES.find(c=>c.id===cityId);
+    const opts = NPC_FOLDERS.map(f => ({ label: f.label, value: f }));
+    openPicker((city?city.name:'Şehir'), opts, (folder) => {
+      if(folder.id === 'dukkan'){
+        const shops = (session.shops||[]).filter(s=>s.cityId===cityId);
+        const shopOpts = shops.map(s => {
+          const m = session.npcs.find(n=>n.id===s.merchantNpcId);
+          return { label: esc(m?m.name:'?') + ' Dükkanı', value: s };
+        });
+        openPicker('Dükkanlar', shopOpts, (shop) => openShopScreen(shop.id), 'Bu şehirde dükkan yok.');
+      } else {
+        const npcs = session.npcs.filter(n=>n.cityId===cityId && n.category===folder.id);
+        const npcOpts = npcs.map(n => ({ label: esc(n.name), value: n }));
+        openPicker(folder.label, npcOpts, () => {}, 'Bu klasörde kimse yok.');
+      }
+    }, 'Klasör yok.');
+  }
+
+  $('btn-add-npc').onclick = () => {
+    if(npcFolderId === 'dukkan') openAddShopPicker();
+    else openNpcModal();
+  };
   function openNpcModal(){
     $('npcm-name').value='';
     const row = $('npcm-colors'); row.innerHTML='';
@@ -2912,8 +3418,25 @@
       sw.onclick = () => { mnpcColor=c; row.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('sel')); sw.classList.add('sel'); };
       row.appendChild(sw);
     });
+    $('npcm-buyprefs-wrap').style.display = (npcFolderId==='tuccar') ? 'block' : 'none';
+    $('npcm-buytype').value = 'hepsi';
+    $('npcm-wearsub').value = 'hepsi';
+    $('npcm-armorslot').value = 'hepsi';
+    $('npcm-jewelslot').value = 'hepsi';
+    $('npcm-wearsub-row').style.display = 'none';
+    $('npcm-armorslot-row').style.display = 'none';
+    $('npcm-jewelslot-row').style.display = 'none';
     $('npc-modal-backdrop').classList.add('open');
   }
+  $('npcm-buytype').onchange = () => {
+    $('npcm-wearsub-row').style.display = $('npcm-buytype').value==='giyilebilir' ? 'block' : 'none';
+    $('npcm-armorslot-row').style.display = 'none';
+    $('npcm-jewelslot-row').style.display = 'none';
+  };
+  $('npcm-wearsub').onchange = () => {
+    $('npcm-armorslot-row').style.display = $('npcm-wearsub').value==='zirhlar' ? 'block' : 'none';
+    $('npcm-jewelslot-row').style.display = $('npcm-wearsub').value==='ziynetler' ? 'block' : 'none';
+  };
   $('npcm-cancel').onclick = () => $('npc-modal-backdrop').classList.remove('open');
   $('npcm-save').onclick = async () => {
     const name = $('npcm-name').value.trim();
@@ -2924,6 +3447,14 @@
       cityId: npcCityId, category: npcFolderId,
       sheet: defaultSheet(), hp:1, mp:1
     };
+    if(npcFolderId === 'tuccar'){
+      newNpc.buyPrefs = {
+        type: $('npcm-buytype').value,
+        wearSubtype: $('npcm-wearsub').value,
+        armorSlot: $('npcm-armorslot').value,
+        jewelSlot: $('npcm-jewelslot').value
+      };
+    }
     newNpc.hp = getMaxHp(newNpc);
     newNpc.mp = getMaxMp(newNpc);
     session.npcs.push(newNpc);
@@ -2980,14 +3511,14 @@
 
   let diceFxQueue = [];
   let diceFxBusy = false;
-  function showDiceRollFX(sides, result){
-    diceFxQueue.push({ sides, result });
+  function showDiceRollFX(sides, result, onComplete){
+    diceFxQueue.push({ sides, result, onComplete });
     if(!diceFxBusy) processDiceFxQueue();
   }
   function processDiceFxQueue(){
     if(diceFxQueue.length === 0){ diceFxBusy = false; return; }
     diceFxBusy = true;
-    const { sides, result } = diceFxQueue.shift();
+    const { sides, result, onComplete } = diceFxQueue.shift();
     let overlay = document.getElementById('dice-roll-overlay');
     if(!overlay){
       overlay = document.createElement('div');
@@ -3013,6 +3544,7 @@
         setTimeout(() => {
           overlay.classList.remove('show');
           shape.classList.remove('settled');
+          if(onComplete) onComplete();
           processDiceFxQueue();
         }, 650);
       }
@@ -3073,6 +3605,15 @@
     return reachable;
   }
 
+  const WM_CITY_PROXIMITY = 2;
+  function wmCityDistance(city){
+    const party = session.worldMap.party;
+    const r0=city.row, r1=city.row+city.rowSpan-1, c0=city.col, c1=city.col+city.colSpan-1;
+    const dr = Math.max(0, r0-party.row, party.row-r1);
+    const dc = Math.max(0, c0-party.col, party.col-c1);
+    return Math.max(dr,dc);
+  }
+
   function renderWmCities(){
     const wrap = $('wm-cities');
     wrap.innerHTML = '';
@@ -3090,6 +3631,7 @@
       label.className = 'wm-city-label';
       label.textContent = city.name;
       marker.appendChild(label);
+      const near = wmCityDistance(city) <= WM_CITY_PROXIMITY;
       if(me.role === 'dm'){
         marker.classList.add('linkable');
         marker.title = 'NPC listesine git';
@@ -3097,6 +3639,10 @@
           npcCityId = city.id; npcView = 'folders'; npcFolderId = null;
           switchTab('npc');
         };
+      } else if(near){
+        marker.classList.add('linkable');
+        marker.title = city.name + ' NPC\u2019lerini gör';
+        marker.onclick = () => openPlayerCityBrowser(city.id);
       }
       wrap.appendChild(marker);
     });
@@ -3184,10 +3730,12 @@
     const cost = def ? (def.cost != null ? def.cost : WM_DEFAULT_COST) : WM_DEFAULT_COST;
     party.row = nr; party.col = nc;
     party.travelRemaining = Math.max(0, (party.travelRemaining||0) - cost);
+    renderWmParty();
+    renderWmMoveButtons();
 
     if(def && def.dice){
       const roll = 1 + Math.floor(Math.random()*def.dice);
-      showDiceRollFX(def.dice, roll);
+      await new Promise(resolve => showDiceRollFX(def.dice, roll, resolve));
       if(def.ambushOn && def.ambushOn.includes(roll)){
         showWmEvent('ambush', '⚔ PUSUYA DÜŞÜRÜLDÜN!');
         logSystemEvent('Yolculukta pusuya düşürüldü! (' + def.label + ', 1d' + def.dice + ': ' + roll + ')');
@@ -3204,14 +3752,43 @@
     const banner = $('wm-event-banner');
     banner.className = 'wm-event-banner show ' + type;
     $('wm-event-banner-text').textContent = text;
+    const giveWrap = $('wm-chest-give-wrap');
+    if(type === 'treasure' && me.role === 'dm'){
+      giveWrap.style.display = 'flex';
+      const tierSel = $('wm-chest-tier-select');
+      tierSel.innerHTML = '';
+      CHEST_TIERS.forEach(c => {
+        const o = document.createElement('option'); o.value = c.key; o.textContent = c.label;
+        tierSel.appendChild(o);
+      });
+      const playerSel = $('wm-chest-player-select');
+      playerSel.innerHTML = '';
+      session.tokens.filter(t=>t.kind==='character').forEach(t => {
+        const o = document.createElement('option'); o.value = t.id; o.textContent = t.name;
+        playerSel.appendChild(o);
+      });
+    } else {
+      giveWrap.style.display = 'none';
+    }
   }
+  $('wm-chest-give-btn').onclick = async () => {
+    const tierKey = $('wm-chest-tier-select').value;
+    const playerId = $('wm-chest-player-select').value;
+    const target = session.tokens.find(t=>t.id===playerId);
+    if(!target) return;
+    addItemToInventory(target, makeChestItem(tierKey));
+    logSystemEvent(chestTierDef(tierKey).label + ' ' + target.name + '\u2019in envanterine eklendi.');
+    await pushRemote();
+    $('wm-event-banner').className = 'wm-event-banner';
+    renderInventoryTab();
+  };
   $('wm-event-banner-close').onclick = () => {
     $('wm-event-banner').className = 'wm-event-banner';
   };
 
   $('btn-wm-travel-roll').onclick = async () => {
     const roll = 1 + Math.floor(Math.random()*6);
-    showDiceRollFX(6, roll);
+    await new Promise(resolve => showDiceRollFX(6, roll, resolve));
     session.worldMap.party.travelRemaining = (session.worldMap.party.travelRemaining||0) + roll;
     session.tokens.filter(t => t.kind!=='creature').forEach(t => { t.fatigue = (t.fatigue||0) + 1; });
     logSystemEvent('Yolculuk zarı atıldı: ' + roll + ' (parti +1 yorgunluk, toplam kalan hareket: ' + session.worldMap.party.travelRemaining + ')');
@@ -3298,6 +3875,39 @@
     applyPendingRemote(); // sheet açıkken ertelenen senkronizasyonu şimdi uygula
   };
 
+  // ---------- Karakter kağıdı: açılır/kapanır bölümler ----------
+  let sheetSectionCollapsed = { bonus:false, combat:false, skills:false, relation:false };
+  function wireSheetSectionToggle(key){
+    const header = $('sheet-sec-h-'+key);
+    const body = $('sheet-sec-'+key);
+    header.onclick = () => {
+      sheetSectionCollapsed[key] = !sheetSectionCollapsed[key];
+      header.classList.toggle('collapsed', sheetSectionCollapsed[key]);
+      body.style.display = sheetSectionCollapsed[key] ? 'none' : 'block';
+    };
+  }
+  ['bonus','combat','skills','relation'].forEach(wireSheetSectionToggle);
+
+  function renderNpcRelationHearts(t, editable){
+    const wrap = $('npc-relation-hearts');
+    wrap.innerHTML = '';
+    const level = Math.max(0, Math.min(10, t.relation==null?5:t.relation));
+    for(let i=1;i<=10;i++){
+      const h = document.createElement('span');
+      h.className = 'npc-heart' + (i<=level ? ' filled' : '');
+      h.textContent = i<=level ? '❤️' : '🤍';
+      if(editable || me.role==='dm'){
+        h.onclick = () => {
+          if(me.role !== 'dm') return;
+          t.relation = i;
+          pushRemote();
+          renderNpcRelationHearts(t, editable);
+        };
+      }
+      wrap.appendChild(h);
+    }
+  }
+
   function renderSheet(t){
     const editable = canControl(t);
     const isCreature = t.kind === 'creature';
@@ -3328,6 +3938,10 @@
 
     $('char-stat-block').style.display = isCreature ? 'none' : 'block';
     $('creature-stat-block').style.display = isCreature ? 'block' : 'none';
+    const isNpc = t.kind === 'npc';
+    $('sheet-sec-h-relation').style.display = isNpc ? 'flex' : 'none';
+    $('sheet-sec-relation').style.display = (isNpc && !sheetSectionCollapsed.relation) ? 'block' : 'none';
+    if(isNpc) renderNpcRelationHearts(t, editable);
     $('melee-settings-row').style.display = 'flex';
     $('melee-calc-hint').style.display = 'block';
 
@@ -3341,6 +3955,13 @@
 
     const list = $('skills-list');
     list.innerHTML = '';
+    const pointsInfo = $('skill-points-info');
+    if(t.kind === 'character'){
+      pointsInfo.style.display = 'block';
+      pointsInfo.textContent = '⭐ Kalan Özellik Puanı: ' + (t.skillPoints||0) + ' (Temel 5\'e kadar 1 puan, 5 üstü 2 puan)';
+    } else {
+      pointsInfo.style.display = 'none';
+    }
     t.sheet.skills.forEach((s, i) => {
       const wrap = document.createElement('div');
       const row = document.createElement('div');
@@ -3364,6 +3985,21 @@
       val.onchange = () => { s.value = parseInt(val.value)||0; val.value = s.value; recalcAndSave(t); renderSheet(t); };
 
       row.appendChild(label); row.appendChild(cat); row.appendChild(val);
+
+      if(t.kind === 'character' && editable){
+        const base = parseInt(s.value)||0;
+        const nextVal = base + 1;
+        const cost = nextVal <= 5 ? 1 : 2;
+        const plus = document.createElement('button');
+        plus.type = 'button';
+        plus.className = 'skill-point-btn';
+        plus.textContent = '+';
+        plus.title = 'Bu özelliği yükselt (' + cost + ' puan)';
+        plus.disabled = (t.skillPoints||0) < cost;
+        plus.onclick = () => spendSkillPoint(t, s, cost);
+        row.appendChild(plus);
+      }
+
       wrap.appendChild(row);
 
       if((s.label||'').trim()){
@@ -3487,6 +4123,8 @@
   }
 
   function renderInventoryTab(){
+    $('shared-gold-input').value = session.gold || 0;
+    $('shared-gold-input').disabled = me.role !== 'dm';
     const subRow = $('inv-subtab-row');
     subRow.innerHTML = '';
     if(me.role === 'dm'){
@@ -3586,6 +4224,14 @@
       const q = qualityOf(item.quality);
       card.style.borderLeft = '4px solid '+q.color;
     }
+    if(item.isChest){
+      card.style.borderLeft = '4px solid '+qualityOf(item.chestTier).color;
+    }
+    if(item.icon){
+      const thumb = document.createElement('img');
+      thumb.src = item.icon; thumb.className = 'picker-icon'; thumb.style.width='36px'; thumb.style.height='36px';
+      card.appendChild(thumb);
+    }
     const info = document.createElement('div'); info.style.flex='1'; info.style.minWidth='0';
     const nm = document.createElement('div'); nm.className='item-name';
     nm.textContent = item.name + ((item.qty||1) > 1 ? ' ×' + item.qty : '');
@@ -3601,6 +4247,11 @@
       eff.textContent = effectNames.join(', ');
       info.appendChild(eff);
     }
+    if(item.value){
+      const val = document.createElement('div'); val.style.fontSize='10.5px'; val.style.color='var(--gold-bright)'; val.style.marginTop='2px';
+      val.textContent = '💰 ' + item.value;
+      info.appendChild(val);
+    }
     card.appendChild(info);
     const equippedSlot = sel.equipment ? EQUIP_SLOTS.find(s => sel.equipment[s.key] === item.id) : null;
     if(equippedSlot){
@@ -3608,6 +4259,21 @@
       badge.style.background='rgba(90,127,166,.18)'; badge.style.borderColor='var(--mana)'; badge.style.color='var(--mana)';
       badge.textContent = 'Kuşanılmış: '+equippedSlot.label;
       card.appendChild(badge);
+    }
+    if(item.isChest){
+      const openBtn = document.createElement('button');
+      openBtn.className = 'ghost-btn';
+      openBtn.style.fontSize='11px'; openBtn.style.padding='6px 10px'; openBtn.style.marginRight='6px'; openBtn.style.flexShrink='0';
+      openBtn.textContent = '🗝 Aç';
+      openBtn.onclick = () => openChestItem(sel, item);
+      card.appendChild(openBtn);
+    } else if(!equippedSlot && canControl(sel)){
+      const sendBtn = document.createElement('button');
+      sendBtn.className = 'ghost-btn';
+      sendBtn.style.fontSize='11px'; sendBtn.style.padding='6px 10px'; sendBtn.style.marginRight='6px'; sendBtn.style.flexShrink='0';
+      sendBtn.textContent = '📤 Gönder';
+      sendBtn.onclick = () => openSendItemPicker(sel, item);
+      card.appendChild(sendBtn);
     }
     const rm = document.createElement('button'); rm.className='rm-btn'; rm.textContent='✕';
     rm.onclick = () => {
@@ -3623,6 +4289,27 @@
     };
     card.appendChild(rm);
     return card;
+  }
+
+  function openSendItemPicker(fromChar, item){
+    const targets = session.tokens.filter(t => t.kind==='character' && t.id !== fromChar.id);
+    const opts = targets.map(t => ({ label: esc(t.name), value: t }));
+    openPicker('Kime Gönderilsin?', opts, (target) => {
+      sendItemToCharacter(fromChar, target, item);
+    }, 'Gönderilebilecek başka karakter yok.');
+  }
+
+  async function sendItemToCharacter(fromChar, toChar, item){
+    if((item.qty||1) > 1){
+      item.qty -= 1;
+    } else {
+      fromChar.inventory = (fromChar.inventory||[]).filter(i=>i.id!==item.id);
+    }
+    const clone = Object.assign({}, item, { id:'i'+Date.now()+Math.floor(Math.random()*999), qty:1 });
+    addItemToInventory(toChar, clone);
+    logSystemEvent(fromChar.name + ', ' + item.name + ' eşyasını ' + toChar.name + '\u2019e gönderdi.');
+    await pushRemote();
+    renderInventoryTab();
   }
 
   // Aynı isim + etiket + kalite + efekt setine sahip eşyayı yığın (stack) olarak bulur
@@ -3644,6 +4331,121 @@
     } else {
       t.inventory.push(Object.assign({ qty:1 }, candidate));
     }
+  }
+
+  // ---------- Loot / sandık sistemi ----------
+  function cloneTemplateAsItem(tpl){
+    return {
+      id:'i'+Date.now()+Math.floor(Math.random()*999),
+      name: tpl.name, tag: tpl.type, quality: tpl.quality, equipSlot: tpl.equipSlot||'Silah',
+      targetMode: tpl.targetMode||'self', range: tpl.range||1, shape: tpl.shape||'1x1', icon: tpl.icon||null, value: tpl.value||0,
+      effects: JSON.parse(JSON.stringify(tpl.effects||[]))
+    };
+  }
+
+  function pickRandomItemTemplate(qualities, typeFilter){
+    const pool = (session.itemTemplates||[]).filter(tpl =>
+      !tpl.noChestDrop &&
+      qualities.includes(tpl.quality) &&
+      (typeFilter ? tpl.type === typeFilter : true)
+    );
+    if(pool.length === 0) return null;
+    return pool[Math.floor(Math.random()*pool.length)];
+  }
+
+  function makeChestItem(chestKey){
+    const def = chestTierDef(chestKey);
+    return {
+      id:'chest'+Date.now()+Math.floor(Math.random()*999),
+      name: def.label, tag:'Sandık', isChest:true, chestTier: def.key, qty:1
+    };
+  }
+
+  async function openChestItem(t, chestItem){
+    const def = chestTierDef(chestItem.chestTier);
+    const roll = 1 + Math.floor(Math.random()*20);
+    await new Promise(resolve => showDiceRollFX(20, roll, resolve));
+    // Sandığı envanterden 1 adet düş
+    if((chestItem.qty||1) > 1) chestItem.qty -= 1;
+    else t.inventory = (t.inventory||[]).filter(i => i.id !== chestItem.id);
+
+    if(roll === 1){
+      logSystemEvent(t.name + ' ' + def.label + '\u2019ı açtı ama içi bomboştu... (1d20: 1)');
+      await pushRemote();
+      renderInventoryTab();
+      return;
+    }
+    const mult = roll === 20 ? 2 : 1;
+    let gold = def.goldDice ? rollDiceExpr(def.goldDice) : (def.goldFlat||0);
+    gold *= mult;
+    session.gold = (session.gold||0) + gold;
+    const droppedNames = [];
+    def.usableSlots.forEach(slot => {
+      for(let k=0;k<mult;k++){
+        const tpl = pickRandomItemTemplate(slot.qualities, 'Kullanılabilir');
+        if(tpl){ addItemToInventory(t, cloneTemplateAsItem(tpl)); droppedNames.push(tpl.name); }
+      }
+    });
+    def.anySlots.forEach(slot => {
+      for(let k=0;k<mult;k++){
+        const tpl = pickRandomItemTemplate(slot.qualities, null);
+        if(tpl){ addItemToInventory(t, cloneTemplateAsItem(tpl)); droppedNames.push(tpl.name); }
+      }
+    });
+    logSystemEvent(t.name + ' ' + def.label + '\u2019ı açtı' + (roll===20?' (Kritik! 20 — 2 kat ödül)':'') + ': +' + gold + ' altın' + (droppedNames.length ? ', ' + droppedNames.join(', ') : ''));
+    await pushRemote();
+    renderInventoryTab();
+  }
+
+  // Bir yaratık öldüğünde: her zaman leveld10 altın düşer (öldüreni ödüllendirir), ayrıca
+  // yaratığın loot ayarına göre (varsa) belirlenen şansla ek eşya/sandık düşer.
+  async function handleCreatureDeathLoot(creature){
+    const level = Math.max(1, (creature.sheet && creature.sheet.level) || 1);
+    const gold = rollDiceExpr(level + 'd10');
+    session.gold = (session.gold||0) + gold;
+    showGoldFloat(creature.id, gold);
+    let extraMsg = '';
+    if(creature.dropsLoot){
+      const tierIdx = Math.min(4, Math.max(0, (creature.lootTier||1)-1));
+      const chance = LOOT_CHANCE_BY_TIER[tierIdx];
+      const roll = Math.random()*100;
+      if(roll < chance){
+        session.groundLoot = session.groundLoot || [];
+        if(creature.lootType === 'sandik'){
+          session.groundLoot.push({ id:'gl'+Date.now()+Math.floor(Math.random()*999), row: creature.row, col: creature.col, isChest:true, chestTier: creature.lootChestTier||'beyaz' });
+          extraMsg = ' + ' + chestTierDef(creature.lootChestTier).label + ' (yere düştü)';
+        } else if(creature.lootItemTemplateId){
+          const tpl = (session.itemTemplates||[]).find(x=>x.id===creature.lootItemTemplateId);
+          if(tpl){
+            session.groundLoot.push({ id:'gl'+Date.now()+Math.floor(Math.random()*999), row: creature.row, col: creature.col, isChest:false, itemTemplateId: tpl.id });
+            extraMsg = ' + ' + tpl.name + ' (yere düştü)';
+          }
+        }
+      }
+    }
+    logSystemEvent(creature.name + ' öldü: parti ortak hazinesine +' + gold + ' altın eklendi' + extraMsg + '.');
+    await pushRemote();
+    renderAll();
+  }
+
+  function showGoldFloat(tokenId, amount){
+    if(!amount) return;
+    const t = session.tokens.find(x=>x.id===tokenId);
+    if(!t) return;
+    const grid = $('grid');
+    if(!grid) return;
+    let foundEl = null;
+    grid.querySelectorAll('.token').forEach(el => {
+      if(parseInt(el.style.left)===t.col*CELL+4 && parseInt(el.style.top)===t.row*CELL+4) foundEl = el;
+    });
+    if(!foundEl) return;
+    const float = document.createElement('div');
+    float.className = 'float-number gold';
+    float.textContent = '+' + amount + ' 💰';
+    float.style.left = foundEl.style.left;
+    float.style.top = foundEl.style.top;
+    grid.appendChild(float);
+    setTimeout(() => float.remove(), 1500);
   }
 
 
@@ -3694,15 +4496,33 @@
   let libTypeFilter = 'Hepsi';
   let libSlotFilter = 'Hepsi';
   let libQualityFilter = 'Hepsi';
+  let libPickerMode = 'inventory'; // 'inventory' | 'lootConfig' | 'shopConfig'
+  let libPickerCreatureId = null;
+  let libPickerShopId = null;
+
+  $('shared-gold-input').onchange = () => {
+    if(me.role !== 'dm') return;
+    session.gold = Math.max(0, parseInt($('shared-gold-input').value)||0);
+    $('shared-gold-input').value = session.gold;
+    pushRemote();
+  };
 
   $('btn-add-from-library').onclick = () => {
     const t = session.tokens.find(x=>x.id===invCharId);
     if(!t) return;
+    libPickerMode = 'inventory'; libPickerCreatureId = null;
     libTypeFilter = 'Hepsi'; libSlotFilter = 'Hepsi'; libQualityFilter = 'Hepsi';
     renderLibraryPicker(t);
     $('library-picker-backdrop').classList.add('open');
   };
   $('lib-picker-close').onclick = () => $('library-picker-backdrop').classList.remove('open');
+
+  function openLootItemPicker(creatureId){
+    libPickerMode = 'lootConfig'; libPickerCreatureId = creatureId;
+    libTypeFilter = 'Hepsi'; libSlotFilter = 'Hepsi'; libQualityFilter = 'Hepsi';
+    renderLibraryPicker(null);
+    $('library-picker-backdrop').classList.add('open');
+  }
 
   function buildFilterChip(row, label, value, currentVal, onPick){
     const chip = document.createElement('div');
@@ -3764,15 +4584,41 @@
       card.className = 'item-tpl-card';
       card.style.borderLeftColor = q.color;
       card.onclick = () => {
+        if(libPickerMode === 'lootConfig'){
+          const creature = session.tokens.find(x=>x.id===libPickerCreatureId);
+          if(creature){
+            creature.lootItemTemplateId = tpl.id;
+            pushRemote();
+            renderCreatureList();
+          }
+          $('library-picker-backdrop').classList.remove('open');
+          return;
+        }
+        if(libPickerMode === 'shopConfig'){
+          const shop = (session.shops||[]).find(s=>s.id===libPickerShopId);
+          if(shop){
+            shop.itemTemplateIds = shop.itemTemplateIds || [];
+            if(!shop.itemTemplateIds.includes(tpl.id)) shop.itemTemplateIds.push(tpl.id);
+            pushRemote();
+            renderShopScreen();
+          }
+          $('library-picker-backdrop').classList.remove('open');
+          return;
+        }
         addItemToInventory(t, {
           id:'i'+Date.now()+Math.floor(Math.random()*999),
           name: tpl.name, tag: tpl.type, quality: tpl.quality, equipSlot: tpl.equipSlot||'Silah',
-          targetMode: tpl.targetMode||'self', range: tpl.range||1, shape: tpl.shape||'1x1',
+          targetMode: tpl.targetMode||'self', range: tpl.range||1, shape: tpl.shape||'1x1', icon: tpl.icon||null, value: tpl.value||0,
           effects: JSON.parse(JSON.stringify(tpl.effects||[]))
         });
         pushRemote();
         renderInventoryTab();
       };
+      if(tpl.icon){
+        const thumb = document.createElement('img');
+        thumb.src = tpl.icon; thumb.className = 'picker-icon'; thumb.style.width='36px'; thumb.style.height='36px';
+        card.appendChild(thumb);
+      }
       const info = document.createElement('div'); info.className='tpl-info';
       const nm = document.createElement('div'); nm.className='tpl-name'; nm.textContent = tpl.name;
       const meta = document.createElement('div'); meta.className='tpl-meta';
@@ -3839,6 +4685,62 @@
       moveSel.onclick = (ev) => ev.stopPropagation();
       moveSel.onchange = async (ev) => { ev.stopPropagation(); t.movementType = moveSel.value; await pushRemote(); };
       info.appendChild(moveSel);
+
+      const lootWrap = document.createElement('div');
+      lootWrap.style.marginTop = '6px';
+      lootWrap.onclick = (ev) => ev.stopPropagation();
+      function selStyle(sel){
+        sel.style.fontSize='11px'; sel.style.padding='4px 6px'; sel.style.marginTop='4px'; sel.style.marginRight='6px';
+        sel.style.background='var(--ink-3)'; sel.style.border='1px solid var(--line)'; sel.style.borderRadius='5px'; sel.style.color='var(--text)';
+      }
+      const dropSel = document.createElement('select'); selStyle(dropSel);
+      [['no','🎁 Drop Düşürür: Hayır'],['yes','🎁 Drop Düşürür: Evet']].forEach(([v,l]) => {
+        const o = document.createElement('option'); o.value=v; o.textContent=l;
+        if((t.dropsLoot?'yes':'no')===v) o.selected = true;
+        dropSel.appendChild(o);
+      });
+      dropSel.onchange = async () => { t.dropsLoot = dropSel.value==='yes'; await pushRemote(); renderCreatureList(); };
+      lootWrap.appendChild(dropSel);
+
+      if(t.dropsLoot){
+        const tierSel = document.createElement('select'); selStyle(tierSel);
+        [1,2,3,4,5].forEach(n => {
+          const o = document.createElement('option'); o.value=n; o.textContent = n+'. Kademe (%'+LOOT_CHANCE_BY_TIER[n-1]+')';
+          if((t.lootTier||1)===n) o.selected = true;
+          tierSel.appendChild(o);
+        });
+        tierSel.onchange = async () => { t.lootTier = parseInt(tierSel.value)||1; await pushRemote(); };
+        lootWrap.appendChild(tierSel);
+
+        const typeSel = document.createElement('select'); selStyle(typeSel);
+        [['esya','Eşya'],['sandik','Sandık']].forEach(([v,l]) => {
+          const o = document.createElement('option'); o.value=v; o.textContent=l;
+          if((t.lootType||'esya')===v) o.selected = true;
+          typeSel.appendChild(o);
+        });
+        typeSel.onchange = async () => { t.lootType = typeSel.value; await pushRemote(); renderCreatureList(); };
+        lootWrap.appendChild(typeSel);
+
+        if((t.lootType||'esya')==='sandik'){
+          const chestSel = document.createElement('select'); selStyle(chestSel);
+          CHEST_TIERS.forEach(c => {
+            const o = document.createElement('option'); o.value=c.key; o.textContent = c.label;
+            if((t.lootChestTier||'beyaz')===c.key) o.selected = true;
+            chestSel.appendChild(o);
+          });
+          chestSel.onchange = async () => { t.lootChestTier = chestSel.value; await pushRemote(); };
+          lootWrap.appendChild(chestSel);
+        } else {
+          const tpl = t.lootItemTemplateId ? (session.itemTemplates||[]).find(x=>x.id===t.lootItemTemplateId) : null;
+          const pickBtn = document.createElement('button');
+          pickBtn.className = 'ghost-btn';
+          pickBtn.style.fontSize='11px'; pickBtn.style.padding='5px 10px'; pickBtn.style.marginTop='4px';
+          pickBtn.textContent = tpl ? ('📦 ' + tpl.name) : '📦 Kütüphaneden Eşya Seç';
+          pickBtn.onclick = () => openLootItemPicker(t.id);
+          lootWrap.appendChild(pickBtn);
+        }
+      }
+      info.appendChild(lootWrap);
 
       function buildRow(statKey, maxVal, colorFn){
         const row = document.createElement('div'); row.className = 'hp-row';
@@ -3945,12 +4847,18 @@
       card.style.borderLeftColor = q.color;
       card.onclick = () => openItemEditor(tpl.id);
 
+      if(tpl.icon){
+        const thumb = document.createElement('img');
+        thumb.src = tpl.icon; thumb.className = 'picker-icon'; thumb.style.width='36px'; thumb.style.height='36px';
+        card.appendChild(thumb);
+      }
+
       const info = document.createElement('div'); info.className='tpl-info';
       const nm = document.createElement('div'); nm.className='tpl-name'; nm.textContent = tpl.name;
       const effectNames = (tpl.effects||[]).filter(e=>e && e.type!=='none').map(e=>EFFECT_DEFS[e.type]?EFFECT_DEFS[e.type].label:e.type);
       const meta = document.createElement('div'); meta.className='tpl-meta';
       const typeText = tpl.type==='Giyilebilir' ? (tpl.type + ' · ' + (tpl.equipSlot||'Silah')) : tpl.type;
-      meta.textContent = typeText + (effectNames.length ? ' · ' + effectNames.join(', ') : '');
+      meta.textContent = typeText + (effectNames.length ? ' · ' + effectNames.join(', ') : '') + (tpl.value ? ' · 💰'+tpl.value : '');
       info.appendChild(nm); info.appendChild(meta);
       card.appendChild(info);
 
@@ -3999,6 +4907,20 @@
     if(!tpl) return;
     $('ie-name').value = tpl.name;
     $('ie-name').oninput = debounce(() => { tpl.name = $('ie-name').value.trim() || tpl.name; pushRemote(); }, 350);
+
+    const iconWrap = $('ie-icon-wrap');
+    iconWrap.innerHTML = '';
+    iconWrap.appendChild(buildIconPicker(tpl.icon, true, (url) => {
+      tpl.icon = url;
+      renderItemEditor();
+      pushRemote();
+    }));
+
+    $('ie-value').value = tpl.value || 0;
+    $('ie-value').oninput = debounce(() => { tpl.value = Math.max(0, parseInt($('ie-value').value)||0); pushRemote(); }, 350);
+
+    $('ie-no-chest').checked = !!tpl.noChestDrop;
+    $('ie-no-chest').onchange = () => { tpl.noChestDrop = $('ie-no-chest').checked; pushRemote(); };
 
     const typeSel = $('ie-type');
     typeSel.innerHTML = '';
@@ -4237,22 +5159,23 @@
 
   function performRoll(t, skill){
     const roll = 1 + Math.floor(Math.random()*20);
-    showDiceRollFX(20, roll);
     const skillBonus = skill ? findSkillValue(t, skill.label.trim().toUpperCase()) : 0;
     const fatiguePenalty = getFatiguePenalty(t);
     const bonus = skillBonus + fatiguePenalty;
     const total = roll + bonus;
-    const entry = {
-      id: 'r'+Date.now()+Math.floor(Math.random()*999),
-      charName: t.name, skillLabel: skill ? skill.label : null,
-      roll, bonus, total, ts: Date.now()
-    };
-    session.rollLog = session.rollLog || [];
-    session.rollLog.unshift(entry);
-    session.rollLog = session.rollLog.slice(0, 15);
-    pushRemote();
-    renderRollLog();
-    showRollToast(entry);
+    showDiceRollFX(20, roll, () => {
+      const entry = {
+        id: 'r'+Date.now()+Math.floor(Math.random()*999),
+        charName: t.name, skillLabel: skill ? skill.label : null,
+        roll, bonus, total, ts: Date.now()
+      };
+      session.rollLog = session.rollLog || [];
+      session.rollLog.unshift(entry);
+      session.rollLog = session.rollLog.slice(0, 15);
+      pushRemote();
+      renderRollLog();
+      showRollToast(entry);
+    });
   }
 
   function showRollToast(entry){
@@ -4279,7 +5202,7 @@
     const skillLabel = range<=1 ? 'YAKIN DÖVÜŞ' : 'ATICILIK';
     const skillVal = findSkillValue(actor, skillLabel) + getFatiguePenalty(actor);
     const roll = 1 + Math.floor(Math.random()*20);
-    showDiceRollFX(20, roll);
+    await new Promise(resolve => showDiceRollFX(20, roll, resolve));
     const total = roll + skillVal;
     const ac = getEffectiveAC(target, false);
     let hit = total >= ac;
@@ -4303,7 +5226,7 @@
     actionMode = null; actingTokenId = null; pendingAbility = null;
     await pushRemote();
     renderAll();
-    checkDeath(target);
+    checkDeath(target, actor);
     flushFloatingNumbers();
   }
 
@@ -4315,7 +5238,7 @@
 
     const skillVal = findSkillValue(actor, ability.skillLabel||'') + getFatiguePenalty(actor);
     const roll = 1 + Math.floor(Math.random()*20);
-    showDiceRollFX(20, roll);
+    await new Promise(resolve => showDiceRollFX(20, roll, resolve));
     const total = roll + skillVal;
     const isMagic = ability.dmgType === 'buyusel';
     const shapeDef = AOE_SHAPES[ability.shape] || AOE_SHAPES['1x1'];
@@ -4406,7 +5329,7 @@
           if(elementType && !terrainReactedIds.has(target.id)) applyElementEffect(target, elementType, ability.name || 'yetenek');
           hitAny = true; hitNames.push(target.name);
         }
-        checkDeath(target);
+        checkDeath(target, actor);
       });
     });
 
@@ -4475,7 +5398,7 @@
             actor.hp = Math.max(0, actor.hp - reflect);
             queueFloat(actor.id, actor.hp - before);
             logSystemEvent(target.name + '\'in dikenleri ' + actor.name + '\'e ' + reflect + ' hasar verdi.');
-            checkDeath(actor);
+            checkDeath(actor, target);
           } else {
             logSystemEvent(target.name + '\'in dikenleri tetiklendi ama hasar 0\'a yuvarlandı (miktar: "' + (eff.params.amount||'boş') + '", gelen hasar: ' + dmg + ').');
           }
@@ -4764,6 +5687,15 @@
     pushRemote();
   }
 
+  function spendSkillPoint(t, s, cost){
+    if(t.kind !== 'character') return;
+    if((t.skillPoints||0) < cost) return;
+    t.skillPoints -= cost;
+    s.value = (parseInt(s.value)||0) + 1;
+    recalcAndSave(t);
+    renderSheet(t);
+  }
+
   $('sheet-name').onchange = () => {
     const t = getSheetToken(); if(!t) return;
     t.name = $('sheet-name').value.trim() || t.name;
@@ -4777,9 +5709,17 @@
   };
   $('sheet-level').onchange = () => {
     const t = getSheetToken(); if(!t) return;
-    t.sheet.level = Math.max(1, parseInt($('sheet-level').value)||1);
+    const oldLevel = t.sheet.level || 1;
+    const newLevel = Math.max(1, parseInt($('sheet-level').value)||1);
+    t.sheet.level = newLevel;
     $('sheet-level').value = t.sheet.level;
+    if(t.kind === 'character' && newLevel > oldLevel){
+      const gained = (newLevel - oldLevel) * 2;
+      t.skillPoints = (t.skillPoints||0) + gained;
+      logSystemEvent(t.name + ' seviye atladı (' + oldLevel + '→' + newLevel + '): +' + gained + ' özellik puanı kazandı.');
+    }
     recalcAndSave(t);
+    renderSheet(t);
   };
   $('sheet-hpbonus').onchange = () => {
     const t = getSheetToken(); if(!t) return;
@@ -4853,6 +5793,13 @@
       if(!ab.effects) ab.effects = [blankEffect(), blankEffect(), blankEffect()];
       const card = document.createElement('div');
       card.className = 'ability-card';
+
+      const iconPicker = buildIconPicker(ab.icon, editable, (url) => {
+        ab.icon = url;
+        renderAbilitiesList(t, editable);
+        pushRemote();
+      });
+      card.appendChild(iconPicker);
 
       const nameInp = document.createElement('input');
       nameInp.className = 'ability-name'; nameInp.value = ab.name || ''; nameInp.placeholder = 'Yetenek adı';
@@ -4968,7 +5915,7 @@
     t.sheet.abilities.push({
       id:'ab'+Date.now()+Math.floor(Math.random()*999),
       name:'', desc:'', manaCost:1, range:1, dmgType:'fiziksel', skillLabel:'', shape:'1x1', spellSchool:'Diğer', actionType:'action',
-      effects:[blankEffect(), blankEffect(), blankEffect()]
+      icon:null, effects:[blankEffect(), blankEffect(), blankEffect()]
     });
     renderAbilitiesList(t, true);
     pushRemote();
